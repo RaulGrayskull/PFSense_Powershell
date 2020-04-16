@@ -26,6 +26,26 @@ class PFAlias {
     }
 }
 
+class PFdhcpd{
+    [PFInterface[]]$interface
+#    [string]$interface
+    [string]$RangeFrom
+    [string]$RangeTo
+    [string]$netmask
+    [string]$Domain
+    [string]$Gateway
+    [string]$NTPServer
+    [string]$DNSServer
+    
+    static [string]$Section = "dhcpd"
+    # property name as it appears in the XML, insofar it's different from the object's property name
+    static $PropertyMapping = @{
+        Interface = "name"
+        RangeFrom = "from"
+        RangeTo = "to"
+    }
+}
+
 class PFFirewallRule {
     [bool]$IsFloating = $false
     [bool]$IsQuick = $false
@@ -70,7 +90,7 @@ class PFFirewallSeparator {
     [string]$row
     [string]$text
     [string]$color
-    [string]$interface
+    [PFInterface[]]$interface
 
     static [string]$Section = "filter/separator"
     # property name as it appears in the XML, insofar it's different from the object's property name
@@ -80,8 +100,8 @@ class PFFirewallSeparator {
 }
 
 class PFGateway {
-#    [PFInterface]$Interface
-    [string]$Interface
+    [PFInterface[]]$interface
+#    [string]$Interface
     [string]$Gateway
     [string]$Monitor
     [string]$Name
@@ -154,9 +174,9 @@ class PFNATRule {
     static $PropertyMapping = @{ 
         LocalPort = "local-port"
         Description = "descr"
-        SourceType = "source/0/name"
-        SourceAddress= "source/0/value"
-        SourcePort = "source/1/value"
+        SourceType = "source/0/name" # The source section and the first name section "source/name[0] = network,address,any"
+        SourceAddress= "source/0/value" # The source section and the first value section "source/value[0] = value of the network,address,any"
+        SourcePort = "source/1/value" # The source section and the second value section "source/value[1] = value of the port section"
         DestType = "destination/0/name"
         DestAddress= "destination/0/value"
         DestPort = "destination/1/value"

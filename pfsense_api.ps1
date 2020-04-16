@@ -70,7 +70,7 @@ Param
 
 # dotsource the classes
 . .\classes.ps1
-
+       
 function ConvertTo-PFObject {
     [CmdletBinding()]
     param (
@@ -83,7 +83,8 @@ function ConvertTo-PFObject {
         # The object type (e.g. PFInterface, PFStaticRoute, ..) to convert to
         [Parameter(Mandatory=$true, ValueFromPipelineByPropertyName=$true)]
             [ValidateSet('PFInterface','PFStaticRoute','PFGateway','PFAlias',
-                         'PFUnbound','PFNATRule','PFFirewallRule','PFFirewallSeparator')]
+                         'PFUnbound','PFNATRule','PFFirewallRule','PFFirewallSeparator',
+                         'PFdhcpd')]
             [string]$PFObjectType
     )
     
@@ -149,7 +150,7 @@ function ConvertTo-PFObject {
                 #       XPath: //member[name='name']/value/string
                 #
                 # Only situation 1 requires handling that differs from other properties, so we'll do it first
-                if($Property -eq "Name"){
+                if($XMLProperty -eq "Name"){ # Changed this to XMLProperty so that in dhcpd interface can be rewritten to name
                     $PropertyValueXPath = "./member/name"
                     $PropertyValue = (Select-Xml -XML $XMLObject -XPath $PropertyValueXPath).Node.InnerText
                 }
@@ -216,10 +217,14 @@ function ConvertTo-PFObject {
                         } 
                         else{
                             $PropertyValue = $(Select-Xml -XML $XMLObject -XPath $PropertyValueXPathname)[$($XMLProperty.split("/")[1])].Node.$($XMLProperty.split("/")[2]).string
-                        }
+                        } 
                     } 
-                    Else{
+                    Else{  
                         $PropertyValueXPath = "//member[name='$($XMLProperty)']/value/string"
+                        $PropertyValue = (Select-Xml -XML $XMLObject -XPath $PropertyValueXPath).Node.InnerText
+                    }
+                    if(-not $PropertyValue){ # for nested array/data/value like in the dhcpd or loadbalancer pools
+                        $PropertyValueXPath = "//member[name='$($XMLProperty)']/value/array/data/value/string"
                         $PropertyValue = (Select-Xml -XML $XMLObject -XPath $PropertyValueXPath).Node.InnerText
                     }
                 }
@@ -423,7 +428,12 @@ function Get-PFFirewallRule {
         # $FirewallSeperator = $InputObject | Get-PFConfiguration | ConvertTo-PFObject -PFObjectType PFFirewallseparator
         # return $FirewallSeperator
     }
+}
 
+function Get-PFdhcpd {
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
+    process { return $InputObject | Get-PFConfiguration | ConvertTo-PFObject -PFObjectType PFdhcpd }
 }
 
 function Invoke-PFXMLRPCRequest {
@@ -659,7 +669,9 @@ $Flow = @{
     "Firewall" = @{
         "print" = "param(`$InputObject); `$InputObject | Get-PFfirewallRule | Format-table *" 
     } 
-     
+    "dhcpd" = @{
+        "print" = "param(`$InputObject); `$InputObject | Get-PFdhcpd | Format-table *" 
+    } 
 
 }
 

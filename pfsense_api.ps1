@@ -244,8 +244,9 @@ function ConvertTo-PFObject {
                 #    if($PropertyValue -like "*||*"){$PropertyValue = $PropertyValue.Split("||")}
                 #    elseif($PropertyValue -like "* *"){$PropertyValue = $PropertyValue.Split(" ")}
                 #    elseif($PropertyValue -like "*,*"){$PropertyValue = $PropertyValue.Split(",")}
-                #} 
-                
+                #}
+                  
+
                 if($PropertyIsCollection){
                     if($Property -eq "detail"){$PropertyValue = $PropertyValue.Split("||")}
                     elseif($Property -eq "address"){$PropertyValue = $PropertyValue.Split(" ")}
@@ -253,17 +254,22 @@ function ConvertTo-PFObject {
                 }
 
 
-
                 # handle the conversion to our custom objects. For all other objects, we assume that the split
                 # was sufficient. We might improve upon this later if necessary.
                 # for now we support a few types only, but this might increase and might need to be refactored if that's the case.
+                 
+                # ToDo: If interface is all. than we can not translate this, needs to be a exception
+                # ToDo: If empty this must not create a error
                 $PropertyTypedValue = New-Object System.Collections.ArrayList
                 ForEach($Item in $PropertyValue){
-                    switch($PropertyType){
-                        "PFInterface" {
-                            $PropertyTypedValue.Add(
-                                ($InputObject.Config.Interfaces | Where-Object { $_.Name -eq $Item })
-                            ) | Out-Null
+                    if($Item -eq 'all'){}
+                    else{
+                        switch($PropertyType){
+                            "PFInterface" {
+                                $PropertyTypedValue.Add(
+                                    ($InputObject.Config.Interfaces | Where-Object { $_.Name -eq $Item })
+                                ) | Out-Null
+                            }
                         }
                     }
                 }
@@ -400,7 +406,9 @@ function Get-PFUnbound {
 
     process {
         $Unbound = $InputObject | Get-PFConfiguration | ConvertTo-PFObject -PFObjectType PFunbound
-
+        foreach($Rule in $Unbound){
+            if($Rule.port -eq "0"){$Rule.port = "53"}
+        } 
         return $Unbound
     }
 }

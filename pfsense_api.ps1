@@ -238,7 +238,8 @@ function ConvertTo-PFObject {
                 
                 # if the property type is a collection, make sure the $PropertyValue is actually a collection. 
                 # In the XML message, things we want to have as collection are separated by comma, a || or a space (as far as we know now)
-                
+                # If the array is empty don't try to split, it will call a error
+
                 # This does not work because the detail field is split with || but has spaces as well
                 #if($PropertyIsCollection){
                 #    if($PropertyValue -like "*||*"){$PropertyValue = $PropertyValue.Split("||")}
@@ -247,12 +248,10 @@ function ConvertTo-PFObject {
                 #}
                   
 
-                if($PropertyIsCollection){
-                    if($PropertyValue){ # If the array is empty don't try to split, it will call a error
-                        if($Property -eq "detail"){$PropertyValue = $PropertyValue.Split("||")}
-                        elseif($Property -eq "address"){$PropertyValue = $PropertyValue.Split(" ")}
-                        else{$PropertyValue = $PropertyValue.Split(",")}
-                    }
+                if($PropertyIsCollection -and $PropertyValue){
+                    if($Property -eq "detail"){$PropertyValue = $PropertyValue.Split("||")}
+                    elseif($Property -eq "address"){$PropertyValue = $PropertyValue.Split(" ")}
+                    else{$PropertyValue = $PropertyValue.Split(",")}
                 }
 
 

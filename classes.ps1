@@ -1,11 +1,8 @@
 # classes to build:
 <#
-dhcpd
+dhcpd = Needs static mapping
 dhcpdv6
 syslog
-nat
-filter = firewall
-aliases
 load_balancer
 openvpn
 unbound = dnsresolver <= strange things happen here
@@ -117,7 +114,7 @@ class PFGateway {
 }
 
 class PFInterface {
-    [string]$Name
+    [ValidateNotNullOrEmpty()][string]$Name
     [string]$Interface
     [string]$Description
     [string]$IPv4Address    # should be [ipaddress] object, but that's for later, is a native powershell object
@@ -213,18 +210,20 @@ class PFStaticRoute {
 }
 
 class PFUnbound {
+#    [string[]]$ActiveInterface
+#    [string[]]$OutgoingInterface
     [PFInterface[]]$active_interface
     [PFInterface[]]$outgoing_interface
     [bool]$dnssec
     [bool]$enable
-    [int]$port
+    [int]$port = 53
     [int]$sslport
-    [string[]]$hosts
-    [string[]]$domainoverrides
+#    [string[]]$hosts
+#    [string[]]$domainoverrides
 
     static [string]$Section = "unbound"
     static $PropertyMapping = @{ 
-        active_interface = "active_interface"
-        outgoing_interface = "outgoing_interface"
+        ActiveInterface = "active_interface"
+        OutgoingInterface = "outgoing_interface"
     }
 }

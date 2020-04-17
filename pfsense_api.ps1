@@ -70,7 +70,7 @@ Param
 
 # dotsource the classes
 . .\classes.ps1
-       
+
 function ConvertTo-PFObject {
     [CmdletBinding()]
     param (
@@ -248,9 +248,11 @@ function ConvertTo-PFObject {
                   
 
                 if($PropertyIsCollection){
-                    if($Property -eq "detail"){$PropertyValue = $PropertyValue.Split("||")}
-                    elseif($Property -eq "address"){$PropertyValue = $PropertyValue.Split(" ")}
-                    else{$PropertyValue = $PropertyValue.Split(",")}
+                    if($PropertyValue){ # If the array is empty don't try to split, it will call a error
+                        if($Property -eq "detail"){$PropertyValue = $PropertyValue.Split("||")}
+                        elseif($Property -eq "address"){$PropertyValue = $PropertyValue.Split(" ")}
+                        else{$PropertyValue = $PropertyValue.Split(",")}
+                    }
                 }
 
 
@@ -262,14 +264,11 @@ function ConvertTo-PFObject {
                 # ToDo: If empty this must not create a error
                 $PropertyTypedValue = New-Object System.Collections.ArrayList
                 ForEach($Item in $PropertyValue){
-                    if($Item -eq 'all'){}
-                    else{
-                        switch($PropertyType){
-                            "PFInterface" {
-                                $PropertyTypedValue.Add(
-                                    ($InputObject.Config.Interfaces | Where-Object { $_.Name -eq $Item })
-                                ) | Out-Null
-                            }
+                    switch($PropertyType){
+                        "PFInterface" {
+                            $PropertyTypedValue.Add(
+                                ($InputObject.Config.Interfaces | Where-Object { $_.Name -eq $Item })
+                            ) | Out-Null
                         }
                     }
                 }
@@ -404,15 +403,14 @@ function Get-PFUnbound {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
 
-    process {
+    process {  
         $Unbound = $InputObject | Get-PFConfiguration | ConvertTo-PFObject -PFObjectType PFunbound
         foreach($Rule in $Unbound){
             if($Rule.port -eq "0"){$Rule.port = "53"}
         } 
-        return $Unbound
+        return $Unbound  
     }
 }
-
 
 function Get-PFNATRule {
     [CmdletBinding()]
@@ -649,6 +647,35 @@ if(-not $PFServer.XMLConfig -or $PFServer.XMLConfig.GetType() -ne [XML]){
 
 # We will have frequent reference to the [PFInterface] objects, to make them readily available
 $PFServer.Config.Interfaces = $PFServer | Get-PFInterface
+
+# add the IPv6 LinkLocal name and description so these can be translated
+foreach($interface in $PFServer.Config.Interfaces){
+    $Properties = @{}
+    if($interface.DESCRIPTION){
+        # If the interface has a description set it as part of it's ipv6 linklocal name
+        $Properties.Name = "_lloc{0}" -f $interface.name
+        $Properties.Description = "{0}IpV6LinkLocal" -f $interface.DESCRIPTION
+    }
+    else{
+        # else use the name as part of the ipv6 linklocal name
+        $Properties.Name = "_lloc{0}" -f $interface.name
+        $Properties.Description = "{0}IpV6LinkLocal" -f $interface.name
+    }
+    $Object = New-Object -TypeName PFInterface -Property $Properties
+    $PFServer.Config.Interfaces = $PFServer.Config.Interfaces + $Object     
+}
+# add some default name translations to the interface's like "all" and "Loopback"
+$StaticInterface = @{
+    all = 'all'
+    lo0 = 'Loopback'
+}
+$StaticInterface.keys | %{
+    $Properties = @{}
+    $Properties.name = $_
+    $Properties.Description = $StaticInterface.Item($_)
+    $Object = New-Object -TypeName PFInterface -Property $Properties
+    $PFServer.Config.Interfaces = $PFServer.Config.Interfaces + $Object 
+}
 
 # define the possible execution flows
 $Flow = @{

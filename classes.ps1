@@ -23,9 +23,8 @@ class PFAlias {
     }
 }
 
-class PFdhcpd{
-    [string[]]$interface
-#    [PFinterface[]]$interface
+class PFDHCPd{
+    [PFInterface]$Interface
     [string]$RangeFrom
     [string]$RangeTo
     [string]$netmask
@@ -37,7 +36,7 @@ class PFdhcpd{
     static [string]$Section = "dhcpd"
     # property name as it appears in the XML, insofar it's different from the object's property name
     static $PropertyMapping = @{
-        Interface = "name"
+        Interface = "_key"
         RangeFrom = "range/from"
         RangeTo = "range/to"
         netmask = "netmask"
@@ -51,26 +50,26 @@ class PFdhcpd{
 class PFdhcpStaticMap{
     [string]$interface
 #    [PFInterface[]]$Interface
-    [string[]]$Hostname
-    [string[]]$Domain
-    [string[]]$ClientID
-    [string[]]$MACaddr
-    [string[]]$IPaddr
-    [string[]]$Description
-    [string[]]$Gateway
-    [string[]]$DNSserver
-    [string[]]$NTPServer
+    [string]$Hostname
+    [string]$Domain
+    [string]$ClientID
+    [string]$MACaddr
+    [string]$IPaddr
+    [string]$Description
+    [string]$Gateway
+    [string]$DNSserver
+    [string]$NTPServer
 
-    static [string]$Section = "dhcpd"
+    static [string]$Section = "dhcpd/staticmap"
     # property name as it appears in the XML, insofar it's different from the object's property name
     static $PropertyMapping = @{
-        Interface = "name"
-        Hostname = "Staticmap/Hostname"
-        Domain = "Staticmap/Domain"
-        ClientID = "Staticmap/CID"
-        IPaddr = "Staticmap/IPaddr"
-        Description  = "Staticmap/descr"
-        MACaddr  = "Staticmap/mac"
+        Interface = "../name"
+        Hostname = "Hostname"
+        Domain = "Domain"
+        ClientID = "CID"
+        IPaddr = "IPaddr"
+        Description  = "descr"
+        MACaddr  = "mac"
     }
 }
 
@@ -84,7 +83,7 @@ class PFFirewallRule {
     [ValidateSet('inet', 'inet6', 'inet46')]
         [string]$IPProtocol
 #    [PFInterface[]]$interface
-    [string[]]$interface
+    [PFInterface[]]$interface
     [ValidateSet('tcp', 'udp', 'tcp/udp', 'icmp', 'esp', 'ah', 'gre', 'ipv6', 
                  'igmp', 'pim', 'ospf', 'tp', 'carp', 'pfsync', '')]
         [string]$Protocol
@@ -129,7 +128,7 @@ class PFFirewallSeparator {
 
 class PFGateway {
 #    [PFInterface[]]$interface
-    [string]$Interface
+    [PFInterface]$Interface
     [string]$Gateway
     [string]$Monitor
     [string]$Name
@@ -165,6 +164,7 @@ class PFInterface {
     static [string]$Section = "interfaces"
     # property name as it appears in the XML, insofar it's different from the object's property name
     static $PropertyMapping = @{
+        Name = "_key"
         Interface = "if"
         Description = "descr"
         IPv4Address = "ipaddr"
@@ -217,6 +217,10 @@ class PFServer {
     [pscredential]$Credential
     [bool]$NoTLS
     [bool]$SkipCertificateCheck = $false
+#<<<<<<< api_xml_rpc
+#    [System.Xml.XmlDocument]$XMLConfig     # XML-RPC answer when requesting the current configuration
+#    [psobject]$PSConfig # $this.XMLConfig parsed to powershell objects by the XmlRpc library
+#=======
     [XML]$XMLConfig
     [psobject]$PFConfig
     [psobject]$WorkingObject

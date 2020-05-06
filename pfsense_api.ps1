@@ -82,151 +82,148 @@ else {
 
 # dotsource the classes
 . .\classes.ps1
-function ConvertToPFObject{
+function ConvertTo-PFObject{
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true)]$InputObject,
-        [Parameter(Mandatory=$false)]$PFObjectType
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)][PFServer]$InputObject,
+        [Parameter(Mandatory=$true)]$PFObjectType
     )
+
     begin{
-        $Object = (New-Object -TypeName $PFObjectType)
-        $PropertyMapping = $Object::PropertyMapping
-        $Collection = New-Object System.Collections.ArrayList
+        # to make the names a bit clearer, use PFType, PFTypeProperties and PFTypePropertyMapping
+        # this because in the parsing, it otherwise gets confusing since there are a lot of variables refering to some $object... thing
+        $PFType = (New-Object -TypeName $PFObjectType)
+        $PFTypeProperties = ($PFType | Get-Member -MemberType properties).Name
+        $PFTypePropertyMapping = $PFType::PropertyMapping
 
-        $Properties = @{}
+        # container for the resulting PF* objects
+        $Collection = New-Object System.Collections.ArrayList        
     } 
+
     process { 
-        $ObjectToParse = $InputObject.PFconfig
-        foreach($XMLPFObj in ($Object::section).Split("/")){
+        # make double sure the PFServer $inputObject has the configuration stored inside. It most likely already has the configuration,
+        # which makes it scenario 2 for Get-PFConfiguration and it will return the $InputObject unaltered.
+        $InputObject = $InputObject | Get-PFConfiguration
+        
+        $ObjectToParse = $InputObject.PSConfig
+        foreach($XMLPFObj in ($PFType::section).Split("/")){
             $ObjectToParse = $ObjectToParse.$XMLPFObj
-        } 
-        $PropertyValue = $null
-        $index = 0 
-        # This IF statement is to see if the $ObjectToParse is a array of object (this happens with the interface), if it is a array, we need to loop to each item to get it's value's
-        if ($ObjectToParse[$Index]){
-            write-host "IF"
-            while($ObjectToParse[$index]){
-                $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
-                    $Property = $_.Name
-                    $XMLProperty = ($PropertyMapping.$Property) ? $PropertyMapping.$Property : $Property.ToLower()
-                    $PropertyValue = $ObjectToParse[$index]
-                    foreach($XMLProp in $XMLProperty.Split("/")){                    
-                        $PropertyValue = $PropertyValue.$XMLProp
-                    }
+        }
+        if(-not $ObjectToParse){ return }
 
-                    
-                    If($PropertyValue -and ($PropertyValue.GetType() -eq [System.Xml.XmlElement])){
-                        $PropertyValue = $PropertyValue.InnerText
-                    }
-                    # The else if is for when a propertyvalue is a array of strings
-                    elseif($PropertyValue -and ($PropertyValue.GetType() -eq [System.Object[]])){
-                        $PropertyArray = New-Object System.Collections.ArrayList
-                        foreach($value in $PropertyValue){
-                            $PropertyArray.add($value.Innertext) | out-null
-                        }
-                        $PropertyValue = $PropertyArray
-                    }
+        # To enable a single and structured approach, we need to make the hashtable key (often the Name property, but not always) 
+        # available in the value (value always is a hashtable). This makes sure we can use one iterable function to iterate over all objects. 
+        # The idea is that one entry in the array/hashtable equals to one PF* object, so after this, we can loop through the array and do the conversion.
+        # The hashtable key will be made available in the array as "_key"
+        if($ObjectToParse.GetType() -eq [hashtable]){
+            $ObjectToParse.GetEnumerator() | ForEach-Object {
+                if($_.Value."_key"){ return } # this is how to simulate "continue" in a ForEach-Object block, see http://stackoverflow.com/questions/7760013/ddg#7763698
+                if($_.Value.PSObject.Methods.Name -notcontains "Add" ){ return }
 
-                    # if($PropertyValue.string){$PropertyValue = $PropertyValue.string}
-                    
-                    $PropertyDefinition = ($Object | Get-Member -MemberType Properties | Where-Object { $_.Name -eq $Property }).Definition
-                    $PropertyType = ($PropertyDefinition.Split(" ") | Select-Object -First 1).Replace("[]", "")
-                    $PropertyIsCollection = $PropertyDefinition.Contains("[]")
- 
-                    # TODO: make the typed conversion work with non-collections too :)
-                    if($PropertyIsCollection -and $PropertyValue){
-                        if($Property -eq "Detail"){$PropertyValue = $PropertyValue.Split("||")}
-                        elseif($Property -eq "Address"){$PropertyValue = $PropertyValue.Split(" ")}
-                        else{$PropertyValue = $PropertyValue.Split(",")}
-                    
-                        $PropertyTypedValue = New-Object System.Collections.ArrayList
-                        ForEach($Item in $PropertyValue){
-                            switch($PropertyType){
-                                "PFInterface" {
-                                    $PropertyTypedValue.Add(
-                                        ($PFconfig.Interfaces | Where-Object { $_.Name -eq $Item })
-                                    ) | Out-Null
-                                }
-                            }
-                        }
-                    }
-                    $Properties.$Property = $PropertyValue
-                }
-                $Object = New-Object -TypeName $PFObjectType -Property $Properties
-                $Collection.Add($Object) | Out-Null
-                $index++
+                $_.Value.Add("_key", $_.Key)
             }
         }
-        # If $ObjectToParse isn't a array we use a slightily different way to get it's value's
-        else{
-            write-host "Else"
-#            foreach($key in $PFconfig.($Object::section).keys){
-            foreach($key in $ObjectToParse.keys){
-                $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
-                    $Property = $_.Name
-                    $XMLProperty = ($PropertyMapping.$Property) ? $PropertyMapping.$Property : $Property.ToLower()
-                    $PropertyValue = $null
-                    if($XMLProperty -eq $key){
-                        $PropertyValue = $ObjectToParse
-                    }
-                    else{
-                        $PropertyValue = $ObjectToParse.$key
-                    }
-                    foreach($XMLProp in $XMLProperty.Split("/")){
-                        if($XMLProp -eq 'name'){
-                            $PropertyValue = $key
-                        }
-                        else{
-                            $PropertyValue = $PropertyValue.$XMLProp
-                        }
-                    }
-                    
-                    If($PropertyValue -and ($PropertyValue.GetType() -eq [System.Xml.XmlElement])){
-                        $PropertyValue = $PropertyValue.InnerText
-                    }
-                    elseif($PropertyValue -and ($PropertyValue.GetType() -eq [System.Object[]])){
-                        $PropertyArray = New-Object System.Collections.ArrayList
-                        foreach($value in $PropertyValue){
-                            $PropertyArray.add($value.Innertext) | out-null
-                        }
-                        $PropertyValue = $PropertyArray 
-                    }
-                    
-                    $PropertyDefinition = ($Object | Get-Member -MemberType Properties | Where-Object { $_.Name -eq $Property }).Definition
-                    $PropertyType = ($PropertyDefinition.Split(" ") | Select-Object -First 1).Replace("[]", "")
-                    $PropertyIsCollection = $PropertyDefinition.Contains("[]")
-                    
-                    # TODO: make the typed conversion work with non-collections too :)
-                    if($PropertyIsCollection -and $PropertyValue){
-                        if($Property -eq "Detail"){$PropertyValue = $PropertyValue.Split("||")}
-                        elseif($Property -eq "Address"){$PropertyValue = $PropertyValue.Split(" ")}
-                        else{$PropertyValue = $PropertyValue.Split(",")}
-                    
-                        $PropertyTypedValue = New-Object System.Collections.ArrayList
-                        ForEach($Item in $PropertyValue){
-                            switch($PropertyType){
-                                "PFInterface" {
-                                    $PropertyTypedValue.Add(
-                                        ($PFconfig.Interfaces.keys | Where-Object { $_ -eq $Item }) 
-                                    ) | Out-Null
-                                } 
-                            }
-                        }
-                    }
-                    
-                    If($PropertyValue -and ($PropertyValue.GetType() -eq [System.Xml.XmlElement])){
-                        $PropertyValue = $PropertyValue.InnerText
-                    }
-                    $Properties.$Property = $PropertyValue
-                    
-                }
-            $Object = New-Object -TypeName $PFObjectType -Property $Properties
-            $Collection.Add($Object) | Out-Null
-            }
-        }
-        $InputObject.WorkingObject = $Collection 
-        return $InputObject
 
+        # now iterate over all objects and convert them
+        $ObjectToParse.GetEnumerator() | ForEach-Object {
+            # the last step of the process will be to create a new object. We need a container with the property values for the PF* object
+            # so that we can splat them into the New-Object cmdlet later
+            $PFObjectProperties = @{} 
+
+            # iterate over all properties that are defined in the PF* object. 
+            # find the property value based on the property mapping (if that exists) or assume the property name in $ObjectToParse is the 
+            # same as in the PF* object if no mapping is defined, i.e. $PFTypeProperty
+            foreach($PFTypeProperty in $PFTypeProperties){
+                # set the default property value: null. We have:
+                # - $PropertyValue: the uncasted property value
+                # - $PropertyTypedValue: $PropertyValue casted to another PF* object, like PFInterface or PFGateway
+                $PropertyValue = $PropertyValues = $PropertyTypedValue = $PropertyTypedValues = $null
+
+                # do the mapping from PFTypeProperty to $ObjectToParse property. Retain the XML in the name to indicate clearly it refers
+                # to the property name as returned by the XML-RPC request. 
+                # if no mapping exists, assume the propertyname in the $ObjectToParse is the same as in the PF* object
+                $XMLProperty = ($PFTypePropertyMapping.$PFTypeProperty) ? $PFTypePropertyMapping.$PFTypeProperty : $PFTypeProperty.ToLower()
+
+                # assign the uncasted property value. If there is a / in the property name, it means that it should be iterated one level deeper.
+                # unlimited deep nesting levels are supported.
+                # if $_ is a hashtable, the value is in $_.Value.$XMLProperty, when it's an array it's in $_.$XMLProperty
+                $XMLPropertyTree = $XMLProperty.Split("/")
+                $XMLPropertyRoot = $XMLPropertyTree | Select-Object -First 1
+
+                # first handle the root. We need to separate this because it's value comes form the array/hashtable $_
+                $PropertyValues = ($_.Value) ? $_.Value.$XMLPropertyRoot : $_.$XMLPropertyRoot
+
+                # now handle all lower levels (if none exists this step will be effectively skipped)
+                foreach($XMLProperty in ($XMLPropertyTree | Select-Object -Skip 1)){
+                    if(-not ($PropertyValues -and $PropertyValues.$XMLProperty)) { break }
+
+                    $PropertyValues = $PropertyValues.$XMLProperty
+                }
+                
+                # if the $PropertyValue equals $null, we do not have to process anything. It doesn't need to be added to the 
+                # $PFObjectProperties hashtable, since $null is the implicit default value. no need to make that explicit.
+                if([string]::IsNullOrEmpty($PropertyValues)){ continue }
+
+                # since the $ObjectToParse is the parsed XML-RPC message, all the values are (supposed to) XMLElements.
+                # we need to replace the XMLElement by its (string) actual value. All other adjustments can be done here as well.
+                $PropertyValues = $PropertyValues | ForEach-Object { ($_.PSObject.Properties.Name -contains "InnerText") ? $_.InnerText : $_ }
+
+                # we need to support two scenario's now: one where the $PropertyValue is a single item and one where it's an array of items
+                # in order to maintain only one workflow, we will make sure it is an array of items (or array of one item). 
+                # after typecasting the propertyvalues later in this cmdlet, we will convert again to single item if necessary.
+                if(($PropertyValues.GetType()).BaseType -ne [array]){ $PropertyValues = @($PropertyValues) }
+
+                # next step is to cast the $PropertyValue to the required type as specified in the PF* object
+                # if we omit this step, we will get an exception when trying to instantiate the object
+                # to enable that, let's gather the property definition to see where to cast to
+                $PropertyDefinition = ($PFType | Get-Member -MemberType Properties | Where-Object { $_.Name -eq $PFTypeProperty }).Definition
+                $PropertyType = ($PropertyDefinition.Split(" ") | Select-Object -First 1).Replace("[]", "")
+                $PropertyIsCollection = $PropertyDefinition.Contains("[]")
+
+                # TODO: the || and space splitted items will be not necessary anymore after PFAlias has been refactored to contain PFAliasEntries
+                #       known issue: PFAlias property Detail is split on space, which should not happen. BUT, properties Address/Detail need to be in their own object anyway
+                # If the property is (should be) a collection but contains only one item, we might need to split them.
+                if($PropertyIsCollection -and ($PropertyValues.Count -eq 1)){
+                    $PropertyValue = $PropertyValues | Select-Object -First 1
+
+                    foreach($Delimeter in @("||", ",", " ")){
+                        if($PropertyValue.Contains($Delimeter)){
+                            $PropertyValues = $PropertyValue.split($Delimeter)
+                            break # only split on 1 delimeter, so stop after one succesful split and do NOT continue with the other possible delimeters
+                        }
+                    }
+                }  
+
+                $PropertyTypedValues = New-Object System.Collections.ArrayList
+                foreach($PropertyValue in $PropertyValues){
+                    switch($PropertyType){
+                        # TODO: PFGateway
+                        #"PFGateway"     { $PropertyTypedValue = $InputObject | Get-PFGateway -Name $Item } 
+                        "PFInterface"   { $PropertyTypedValue = $InputObject | Get-PFInterface -Name $PropertyValue }
+                        "bool"          { $PropertyTypedValue = ([bool]$PropertyValue -or ($PropertyValue -in ('yes', 'true', 'checked'))) }
+                        default         { $PropertyTypedValue = $PropertyValue }
+                    }
+
+                    $PropertyTypedValues.Add($PropertyTypedValue) | Out-Null
+                }
+
+                # at this point, the:
+                #   - $PropertyTypedValues contains an array with all the $PropertyTypedValue items
+                #   - $PropertyTypedValue contains the casted version of the last $Item
+                #
+                # if $PropertyIsCollection we will add the array to the $PFObjectProperties hashtable
+                # if the value should be singular (e.g. $PropertyIsCollection is false), we will add the $PropertyTypedValue
+                # this behavior mimics that the last item overwrites earlier items (if any). 
+                $PFObjectProperties.$PFTypeProperty = ($PropertyIsCollection) ? $PropertyTypedValues : $PropertyTypedValue
+            } # end loop through all PFTypeProperties
+
+            # create the instance of PFType and add it to the collection
+            $PFTypeInstance = New-Object -TypeName $PFObjectType -Property $PFObjectProperties
+            $Collection.Add($PFTypeInstance) | Out-Null
+        }
+        
+        # return the collection with PF* objects
+        return $Collection
     }
 }
 
@@ -256,40 +253,135 @@ function FormatXml {
         }
 }
 
-function GetPFConfiguration {
+function Get-PFConfiguration {
+    <#
+    .SYNOPSIS
+        Fetch the current configuration from a pfSense server via XML-RPC. Convert the XML-RPC answer to a Powershell object.
+    
+    .DESCRIPTION
+        This function takes a PFServer object and adds to it the configuration for this server. 
+        
+        There are three scenario's which are supported by this function:
+        1) The PFServer object has no XMLConfig saved
+        2) The PFServer object has a XMLConfig saved already
+        3) The PFServer object has a XMLConfig saved already but the user wants to have it refreshed
+
+        Ad 1: 
+        If there is no XML configuration in the PFServer object, it will be fetched from the pfSense as defined in the PFServer object.
+        After fetching and validating the XML, it will be converted into a Powershell object for easier parsing by other functions.
+
+        Ad 2:
+        The supplied PFServer object already has a configuration stored inside. Do nothing and just return the PFServer object.
+
+        Ad 3:
+        For some reason the user suspects the saved configuration (if any) might be stale so it should be refreshed. It can do do so by setting
+        the -NoCache flag to force scenario 1 to be executed after clearing the currently saved configuration.
+    
+    .PARAMETER Server
+        The PFServer object to act on. This value can be passed by pipeline and multiple PFServer objects can be passed that way at once.
+
+    .PARAMETER NoCache
+        Switch to indicate that any saved configuration MUST be refreshed by querying the pfSense server
+
+    #>
     [CmdletBinding()]
+    [OutputType('PFServer')] 
     param (
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
             [Alias('Server')]
             [PFServer]$InputObject,
-        [Parameter(Mandatory=$false, HelpMessage="The section of the configuration you want, e.g. interfaces or system/dnsserver")]
-            [string]$Section        
+        [Parameter(Mandatory=$false)]
+            [switch]$NoCache
     )
     
-    begin {
-        # Due to some changes, this whole section thing isn't very relevant anymore and might introduce extra bugs.
-        # TODO: consider removing this section thing support
-        if(-not [string]::IsNullOrWhiteSpace($Section)){
-            $Section = $Section -split "/" | Join-String -Separator "']['" -OutputPrefix "['" -OutputSuffix "']"
-        }
-    }
-    
     process {
-        $XMLConfig = $null
+        # check for scenario 3, i.e. forced refresh of possibly stale cached configuration. 
+        # Set both the XMLConfig and PSConfig properties to $null to force the Invoke-PFXMLRPCRequest to be executed
+        if($NoCache){ $InputObject.XMLConfig = $InputObject.PSConfig = $null }
 
-        if($InputObject.XMLConfig -and $InputObject.XMLConfig.GetType() -eq [XML] -and [string]::IsNullOrWhiteSpace($Section)){             
-            $XMLConfig = $InputObject.XMLConfig
-        
-        } else {
-            $XMLConfig = InvokePFXMLRPCRequest -Server $InputObject -Method 'exec_php' -MethodParameter ('global $config; $toreturn=$config{0};' -f $Section)
+        # check if the XML configuration has been saved and is valid (scenario 2). If this is NOT the case (i.e. scenario 1), update the configuration.
+        if((-not $InputObject.XMLConfig) -or ($InputObject.XMLConfig.GetType() -ne [XML])){
+            try{
+                $InputObject.XMLConfig = Invoke-PFXMLRPCRequest -InputObject $InputObject -Method 'exec_php' -MethodParameter 'global $config; $toreturn=$config;'
+                $InputObject.PSConfig = ConvertFrom-Xml -InputObject $InputObject.XMLConfig
+
+            } catch {
+                # TODO: do some proper error handling here. Need to handle the exceptions that Invoke-PFXMLRPCRequest or ConvertFrom-XML can throw
+                Write-Error $_.Exception.Message
+                Write-Error $_.Exception
+                exit 1
+            }
         }
-        
-        #TODO: fetch only the relevant section if contains other sections too. Low prio.
-        $InputObject.XMLConfig = $XMLConfig
-        $InputObject.PFconfig = (ConvertFrom-Xml -InputObject $XMLConfig)
+
         return $InputObject
     }    
 }
+
+function Get-PFInterface {
+    <#
+    .SYNOPSIS 
+        Get a PFInterface object for each of the interfaces that are available in the pfSense
+
+    .DESCRIPTION
+        Get-PFInterface is one of the more extensive Get-PF* functions, since there are a couple of special things that need to happen
+        First, it gets the interfaces as defined in the pfSense configuration. So far, that's very standard behavior.
+        Secondly, it adds some interfaces that are not explicitly defined but nonetheless exist in the pfSense server, e.g. lo0 (local loopback)
+
+    .PARAMETER Server
+        Alias for InputObject, accepts the pipeline input. This should be a PFServer object.
+
+    .PARAMETER Name
+        Optional parameter to filter by interface name. 
+    #>
+    [CmdletBinding()]
+    [OutputType([PFInterface[]])]
+    param (
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$false)][string]$Name
+    )   
+    process { 
+        # TODO: for performance reasons, you might want to consider a check if the interfaces exist already. In that case, you can simply return the existing version already.
+        #       without that addition is might perform a few extra steps every time, but it's very unlikely that it will be a bottleneck.
+
+        # Since we will add some ephemeral interfaces later on, the $Interfaces array needs to be extensible and hence be explictly defined as ArrayList first
+        $Interfaces = New-Object System.Collections.ArrayList
+
+        # Retrieve the explicitly defined interfaces from the pfSense configuration and add them to the $Interfaces collection.  
+        $InterfacesFromConfig = $InputObject |  ConvertTo-PFObject -PFObjectType "PFInterface"
+        $InterfacesFromConfig | ForEach-Object { $Interfaces.Add($_) | Out-Null }
+        
+        # add the IPv6 LinkLocal name and description so these can be translated
+        $InterfacesFromConfig.GetEnumerator() | ForEach-Object {
+            $Properties = @{
+                Name = "_lloc{0}" -f $_.Name
+                Description = "{0}IpV6LinkLocal" -f (($_.Description) ? $_.Description : $_.Name)
+            }
+             
+            $EphemeralInterface = New-Object -TypeName "PFInterface" -Property $Properties
+            $Interfaces.Add($EphemeralInterface) | Out-Null    
+        }
+
+        # there is also a number of implicitly defined interfaces that do not appear in the configuration
+        # these are the Link Local, loopback and the IPv6 interfaces. 
+        # there is also a special interface All, which is a reference to all interfaces. This one is used for example in service configurations
+        # that should listen on all interfaces and is functionally equivalent to :: . 
+        # However, in the configuration for these services (e.g. DNS server) it appears as string "all"
+        # We need to manually create these "static interfaces" to satisfy the type definition/conversion on the PF* where an interface is defined
+        # as [PFInterface]$Interface (or [PFInterface[]]$Interface in some cases.)
+        (@{ all = 'All'; lo0 = 'Loopback' }).GetEnumerator() | ForEach-Object {
+            $EphemeralInterface =  New-Object -TypeName "PFInterface" -Property @{ Name = $_.Key; Description = $_.Value }
+            $Interfaces.Add($EphemeralInterface) | Out-Null
+        }
+
+        # return section
+        # return all the interfaces if no $Name parameter was given
+        if([string]::IsNullOrWhitespace($Name)){
+            return $Interfaces
+        
+        # return the $Interfaces, filtered by Name -eq $Name
+        } else {           
+            return ($Interfaces | Where-Object { $_.Name -eq $Name })
+        }
 
 function AddPFAlias {
     [CmdletBinding()]
@@ -328,14 +420,11 @@ function AddPFAlias {
         $InputObject.WorkingObject | Format-Table *
     }
 }
-
-
 function GetPFAlias {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
     process {
-        ConvertToPFObject -InputObject $InputObject -PFObjectType "PFAlias" | out-null
-        return $InputObject | out-null
+        $InputObject | ConvertTo-PFObject -PFObjectType "PFAlias"
     }
 }
 
@@ -353,17 +442,15 @@ function GetPFdhcpd {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
     process {
-        ConvertToPFObject -InputObject $InputObject -PFObjectType "PFdhcpd" | out-null
-        return $InputObject | out-null
+        $InputObject | ConvertTo-PFObject -PFObjectType "PFDHCPd"
     }
 } 
 
-function GetPFdhcpStaticMap {
+function Get-PFdhcpStaticMap {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
     process {
-        ConvertToPFObject -InputObject $InputObject -PFObjectType "PFdhcpStaticMap" | out-null
-        return $InputObject | out-null
+        $InputObject | ConvertTo-PFObject -PFObjectType "PFDHCPStaticMap"
     }
 }
 function PrintPFdhcpStaticMap {
@@ -395,18 +482,20 @@ function PrintPFdhcpStaticMap {
     }
 }
 
-function GetPFFirewallRule {
+function Get-PFFirewallRule {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
     process {
-        ConvertToPFObject -InputObject $InputObject -PFObjectType "PFfirewallRule" | out-null
-        return $InputObject | out-null
+        $InputObject | ConvertTo-PFObject -PFObjectType "PFfirewallRule"
     }
 }
 function PrintPFFirewallRule {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
     process {
+    # TODO: this applies to all Firewall objects, so I'd suggest to move it to Get-PFFirewallRule
+    #       alternatively, you can make this a Write-PFFirewallRule cmdlet that also does the Write-Host part (e.g. no Format-Table on the output, but instead in this function)
+    #       the Get-PF* functions should still (just) return the PF* objects!
             foreach($Rule in $InputObject.WorkingObject){
                 ("Source","Destination") | foreach {
                     $Rule.$($_+"Port") = ($Rule.$_.Port) ? $Rule.$_.Port.InnerText : "any"
@@ -429,21 +518,18 @@ function PrintPFFirewallRule {
     }
 }
 
-
-function GetPFGateway {
+function Get-PFGateway {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
     process {
-        ConvertToPFObject -InputObject $InputObject -PFObjectType "PFGateway" | out-null
-        return $InputObject | out-null
+        $InputObject | ConvertTo-PFObject -PFObjectType "PFGateway"
     }
 }
-function GetPFNATRule {
+function Get-PFNATRule {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
     process {
-        ConvertToPFObject -InputObject $InputObject -PFObjectType "PFnatRule" | out-null
-        return $InputObject | out-null
+        $InputObject | ConvertTo-PFObject -PFObjectType "PFnatRule"
     }
 
 }
@@ -478,17 +564,15 @@ function GetPFStaticRoute {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
     process {
-        ConvertToPFObject -InputObject $InputObject -PFObjectType "PFStaticRoute" | out-null
-        return $InputObject | out-null
+        $InputObject | ConvertTo-PFObject -PFObjectType  "PFStaticRoute"
     }
 }
 
-function GetPFUnbound {
+function Get-PFUnbound {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
     process {
-        ConvertToPFObject -InputObject $InputObject -PFObjectType "PFUnbound" | out-null
-        return $InputObject | out-null
+        $InputObject | ConvertTo-PFObject -PFObjectType  "PFUnbound"
     }
 } 
 
@@ -511,17 +595,15 @@ function PrintPFUnbound {
     }
 } 
 
-
-function GetPFunboundHost {
+function Get-PFunboundHost {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
     process { 
-        ConvertToPFObject -InputObject $InputObject -PFObjectType "PFunboundHost" | out-null
-        return $InputObject | out-null
+        $InputObject | ConvertTo-PFObject -PFObjectType "PFunboundHost"
     }
 }
 
-function InvokePFXMLRPCRequest {
+function Invoke-PFXMLRPCRequest {
     <#
     .DESCRIPTION
         https://github.com/pfsense/pfsense/blob/master/src/usr/local/www/xmlrpc.php
@@ -655,7 +737,7 @@ function TestPFCredential {
             }
             
             Write-Debug "Trying credentials for user '$($Server.Credential.UserName)'"
-            InvokePFXMLRPCRequest -Server $Server -Method 'host_firmware_version' | Out-Null
+            Invoke-PFXMLRPCRequest -Server $Server -Method 'host_firmware_version' | Out-Null
 
         # catch when use of the system is not possible with this credentials
         } catch [System.Security.Authentication.InvalidCredentialException],
@@ -682,6 +764,9 @@ function TestPFCredential {
 # since debugging dotsourced files s*, leave it here for now until we're ready for a first release
 # TODO: create a switch for the program to skip this contoller logic and be able to test dotsourcing this file in your own scripts too.
 Clear-Host
+
+
+$PFServer = New-Object PFServer -Property @{
 
 $Arguments = @{
     "Alias" = $Alias
@@ -727,126 +812,113 @@ try{
     Write-Progress -Activity "Testing connection and your credentials" -Completed
 }
 
-# Get all config information so that we can see what's inside
-$PFServer = GetPFConfiguration -Server $PFServer -Section  "" 
-if(-not $PFServer.XMLConfig -or $PFServer.XMLConfig.GetType() -ne [XML]){ 
-    Write-Error "Unable to fetch the pfSense configuration."
-    exit 1
-}
+# Get- all config information so that we can see what's inside
+$PFServer = ($PFServer | Get-PFConfiguration -NoCache)
 
-# We will have frequent reference to the [PFInterface] objects, to make them readily available
-GetPFInterface -Server $PFServer
-$PFServer.Config.Interfaces = $PFServer.WorkingObject
-
-# add the IPv6 LinkLocal name and description so these can be translated
-foreach($interface in $PFServer.Config.Interfaces){
-    $Properties = @{}
-    if($interface.DESCRIPTION){
-        # If the interface has a description set it as part of it's ipv6 linklocal name
-        $Properties.Name = "_lloc{0}" -f $interface.name
-        $Properties.Description = "{0}IpV6LinkLocal" -f $interface.DESCRIPTION
-    }
-    else{
-        # else use the name as part of the ipv6 linklocal name
-        $Properties.Name = "_lloc{0}" -f $interface.name
-        $Properties.Description = "{0}IpV6LinkLocal" -f $interface.name
-    }
-    $Object = New-Object -TypeName PFInterface -Property $Properties
-    $PFServer.Config.Interfaces = $PFServer.Config.Interfaces + $Object     
-}
-# add some default name translations to the interface's like "all" and "Loopback"
-$StaticInterface = @{
-    all = 'all'
-    lo0 = 'Loopback'
-}
-$StaticInterface.keys | %{
-    $Properties = @{}
-    $Properties.name = $_
-    $Properties.Description = $StaticInterface.Item($_)
-    $Object = New-Object -TypeName PFInterface -Property $Properties
-    $PFServer.Config.Interfaces = $PFServer.Config.Interfaces + $Object 
-}
-
-# test objects
+<# test objects
 # make a clear visual distinction between this run and the previous run
-<#
-1..30 | ForEach-Object { Write-Host "" } 
+#
+<#1..30 | ForEach-Object { Write-Host "" }
 
+
+# works
+Write-Host "Known interfaces:" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
+$PFServer | Get-PFInterface | Format-table *
+
+# works
+Write-Host "LAN interface:" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
+$PFServer | Get-PFInterface -Name "lan" | Format-table *
+
+# works
+# TODO: separate each address/detail in a separate child object, like PFAliasEntry or something like that. Each PFAlias should then contain a collection of these.
 Write-Host "Registered aliases:" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$PFServer | GetPFAlias | Format-table *
+$PFServer | Get-PFAlias | Format-table *
 
+# works
 Write-Host "Registered DHCPd servers" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$PFServer | GetPFdhcpd | Format-table *
+$DHCPdServers = $PFServer | Get-PFDHCPd
+$DHCPdServers | Format-table *
+$DHCPdInterfaceType = ($DHCPdServers | Select-Object -First 1 -ExpandProperty Interface).GetType()
+$DHCPdInterfaceIsPFInterface = $DHCPdInterfaceType -eq [PFInterface]
+Write-Host ("Typecheck of Interface property of DHCPd server 1: {0}" -f $DHCPdInterfaceType) -ForegroundColor ($DHCPdInterfaceIsPFInterface ? "Green" : "Red")
 
+# TODO: a lot
 Write-Host "Registered static DHCP leases" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
 $PFServer | Get-PFDHCPStaticMap | Format-table *
 
+# TODO: source/destination
 Write-Host "All firewall rules" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
 # TODO: if you want to convert System.Collections.Hashtable into something more meaningful (display only), do it here
 #       obviously creating a Write-PFFirewallRule function would be an even better idea :)
-#       DO NOT change it in the ConvertToPFObject function, since that will really complicate the reverse operation (changing and uploading the rule)
-$PFServer | GetPFFirewallRule | Select-Object -ExcludeProperty Source, Destination | Format-table *
+#       DO NOT change it in the ConvertTo-PFObject function, since that will really complicate the reverse operation (changing and uploading the rule)
+$PFServer | Get-PFFirewallRule | Select-Object -ExcludeProperty Source, Destination | Format-table *
 
+# works
 Write-Host "Registered gateways" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$PFServer | GetPFGateway | Format-table *
+$PFServer | Get-PFGateway | Format-table *
 
-Write-Host "Available interfaces" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$PFServer | GetPFInterface | Format-table *
-
+# TODO: a lot
 Write-Host "All NAT rules" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$PFServer | GetPFNATRule | Format-table *
+$PFServer | Get-PFNATRule | Format-table *
 
+# TODO: mapping to PFGateway object
 Write-Host "All static routes" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$PFServer | GetPFStaticRoute | Format-table *
+$PFServer | Get-PFStaticRoute | Format-table *
 
+# TODO: mapping to PSObject 
 Write-Host "DNS server settings" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$PFServer | GetPFUnbound | Format-table *
+$PFServer | Get-PFUnbound | Format-table *
 
+# TODO: mapping to PSObject
 Write-Host "DNS host overrides" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$PFServer | GetPFunboundHost | Format-table *
+$PFServer | Get-PFunboundHost | Format-table *
 
 Write-Host "THE END" -BackgroundColor Gray -ForegroundColor DarkGray
 exit;
 #>
 
-# define the possible execution flows
+<# define the possible execution flows #>
 $Flow = @{
     "alias" = @{
-        "print" = "param(`$InputObject); `$InputObject | GetPFAlias; `$InputObject.WorkingObject | Format-Table *"#the star makes the format table show more than 10 column's
+#        "print" = "param(`$InputObject); `$InputObject | Get-PFAlias | Format-Table *"#the star makes the format table show more than 10 column's
+#        "print" = "param(`$InputObject); `$InputObject | GetPFAlias; `$InputObject.WorkingObject | Format-Table *"#the star makes the format table show more than 10 column's
         "add" = "param(`$InputObject); `$InputObject | GetPFAlias; AddPFAlias -Server `$InputObject"
+
     }
 
     "gateway" = @{
-        "print" = "param(`$InputObject); `$InputObject | GetPFGateway; `$InputObject.WorkingObject | Format-Table *"
+        "print" = "param(`$InputObject); `$InputObject | Get-PFGateway | Format-Table *"
     }
 
     "interface" = @{
-        "print" = "param(`$InputObject); `$InputObject | GetPFInterface; `$InputObject.WorkingObject | Format-Table *"
+        "print" = "param(`$InputObject); `$InputObject | Get-PFInterface | Format-Table *"
     }
 
     "StaticRoute" = @{
-        "print" = "param(`$InputObject); `$InputObject | GetPFStaticRoute; `$InputObject.WorkingObject | Format-table *"
+        "print" = "param(`$InputObject); `$InputObject | Get-PFStaticRoute | Format-table *"
     }
 
     "dnsResolver" = @{
-        "print" = "param(`$InputObject); `$InputObject | GetPFUnbound; `$InputObject | PrintPFUnbound; `$InputObject.WorkingObject | Format-table *"
+        "print" = "param(`$InputObject); `$InputObject | Get-PFUnbound; `$InputObject | PrintPFUnbound | Format-table *"
     }    
 
     "dnsResolverHost" = @{
-        "print" = "param(`$InputObject); `$InputObject | GetPFunboundHost; `$InputObject.WorkingObject | Format-table *"
+        "print" = "param(`$InputObject); `$InputObject | Get-PFunboundHost | Format-table *"
     }   
 
     "portfwd" = @{
-        "print" = "param(`$InputObject); `$InputObject | GetPFNATRule; `$InputObject | PrintPFNatRule; `$InputObject.WorkingObject | Select-Object -ExcludeProperty Source, Destination | Format-table *"
+#        "print" = "param(`$InputObject); `$InputObject | Get-PFNATRule | Format-table *"
+#        "print" = "param(`$InputObject); `$InputObject | GetPFNATRule; `$InputObject | PrintPFNatRule; `$InputObject.WorkingObject | Select-Object -ExcludeProperty Source, Destination | Format-table *"
+
     }    
     "Firewall" = @{
-        "print" = "param(`$InputObject); `$InputObject | GetPFFirewallRule; `$InputObject | PrintPFFirewallRule; `$InputObject.WorkingObject | Select-Object -ExcludeProperty Source, Destination | Format-table *" 
+        "print" = "param(`$InputObject); `$InputObject | Get-PFFirewallRule | PrintPFFirewallRule | Select-Object -ExcludeProperty Source, Destination | Format-table *" 
     } 
     "dhcpd" = @{
-        "print" = "param(`$InputObject); `$InputObject | GetPFdhcpd; `$InputObject.WorkingObject | Format-table *" 
+        "print" = "param(`$InputObject); `$InputObject | Get-PFDHCPd | Format-table *" 
     } 
     "dhcpStaticMap" = @{
-        "print" = "param(`$InputObject); `$InputObject | Get-PFdhcpStaticMap; `$InputObject | PrintPFdhcpStaticMap; `$InputObject.WorkingObject | Format-table * -autosize" 
+        "print" = "param(`$InputObject); `$InputObject | Get-PFdhcpStaticMap; `$InputObject | PrintPFdhcpStaticMap | Format-table * -autosize" 
     } 
 
 }
@@ -863,3 +935,4 @@ try{
     Write-Error $_.Exception
     exit 1    
 }
+#>

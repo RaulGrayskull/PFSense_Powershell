@@ -1,31 +1,8 @@
 portfwd and firewall:
 translate the source and destination opt1 to userdefined name's
 
-<<<<<<< HEAD
 portfwd:
 sometime's we still get a System.Collections.Hashtable value
-=======
-Alias:
--All
-
-dhcpd:
--All
-
-dhcpStaticMap:
--All 
-
-Firewall:
-- ALL
-
-gateway:
--All
-
-interface:
-Works
-
-StaticRoute:
-Works
->>>>>>> 721bfc854c70777913de07d31a44f32cd79a4fae
 
 dnsresolver:
 crashes
@@ -33,13 +10,8 @@ crashes
 dnsresolverhosts:
 crashes
 
-<<<<<<< HEAD
 Interface:
 don't print internal translation name's "all, lo0, _**"
-=======
-portfwd:
--All
->>>>>>> 721bfc854c70777913de07d31a44f32cd79a4fae
 
 alias:
 create subobject's for the entry's in a alias

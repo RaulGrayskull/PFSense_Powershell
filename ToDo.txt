@@ -1,38 +1,17 @@
-All:
-- Interface name convertion
-
-Alias:
--All
-
-dhcpd:
--All
-
-dhcpStaticMap:
--All 
-
-Firewall:
-- SourceType
-- SourceAddress
-- SourcePort
-- DestinationType
-- DestinationAddress
-- DestinationPort
-
-gateway:
--All
-
-interface:
-Works
-
-StaticRoute:
-Works
-
-dnsResolver:
--All
-
-dnsResolverHost:
-Works
+portfwd and firewall:
+translate the source and destination opt1 to userdefined name's
 
 portfwd:
-SourceAddress only works for network we need a way to try address any our network
+sometime's we still get a System.Collections.Hashtable value
 
+dnsresolver:
+crashes
+
+dnsresolverhosts:
+crashes
+
+Interface:
+don't print internal translation name's "all, lo0, _**"
+
+alias:
+create subobject's for the entry's in a alias

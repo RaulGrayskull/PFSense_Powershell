@@ -55,6 +55,9 @@ And as usual, some personal preferences apply.
 https://github.com/RaulGrayskull/PFSense_Powershell
 
 #>
+
+
+<#
 Param
     (
     [Parameter(Mandatory=$true, HelpMessage='The pfSense network address (DNS or IP)')] [string] $Server,
@@ -74,7 +77,7 @@ if (Get-Module -ListAvailable -Name XmlRpc) {
 else {
     Install-Module -Name XmlRpc
 }
-
+#>
 # dotsource the classes
 . .\classes.ps1
 function ConvertTo-PFObject{
@@ -387,7 +390,7 @@ function Get-PFAlias {
         $InputObject | ConvertTo-PFObject -PFObjectType "PFAlias"
     }
 }
-
+ 
 function Get-PFDHCPd {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
@@ -396,75 +399,39 @@ function Get-PFDHCPd {
     }
 } 
 
-function Get-PFdhcpStaticMap {
+function Get-PFDHCPStaticMap {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
     process {
         $InputObject | ConvertTo-PFObject -PFObjectType "PFDHCPStaticMap"
-    }
+    } 
 }
-function PrintPFdhcpStaticMap {
-    [CmdletBinding()]
-    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
-    process {
-        $Object = (New-Object -TypeName "PFdhcpStaticMap")
-        $Collection = New-Object System.Collections.ArrayList
-        foreach($Staticmap in $InputObject.WorkingObject){
-            $indexStaticMap = 0 
-            $Properties = @{}
-                while($Staticmap.MACaddr[$indexStaticMap]){
-                    $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
-                        $Property = $_.Name
-                        if($Property -eq "interface"){$PropertyValue = $Staticmap.interface}
-                        else{
-                            try {$PropertyValue = $Staticmap.$Property[$indexStaticMap]}
-                            catch{$PropertyValue = $Staticmap.$Property}
-                        }
-                        $Properties.$Property = $PropertyValue
-                    }
-                    $Object = New-Object -TypeName "PFdhcpStaticMap" -Property $Properties
-                    $Collection.Add($Object) | Out-Null
-                    $indexStaticMap++
-                }
-        }
-        $InputObject.WorkingObject = $Collection
-        return $InputObject | out-null
-    }
-}
+
 
 function Get-PFFirewallRule {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
     process {
-        $InputObject | ConvertTo-PFObject -PFObjectType "PFfirewallRule"
-    }
-}
-function PrintPFFirewallRule {
-    [CmdletBinding()]
-    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
-    process {
-    # TODO: this applies to all Firewall objects, so I'd suggest to move it to Get-PFFirewallRule
-    #       alternatively, you can make this a Write-PFFirewallRule cmdlet that also does the Write-Host part (e.g. no Format-Table on the output, but instead in this function)
-    #       the Get-PF* functions should still (just) return the PF* objects!
-            foreach($Rule in $InputObject.WorkingObject){
-                ("Source","Destination") | foreach {
-                    $Rule.$($_+"Port") = ($Rule.$_.Port) ? $Rule.$_.Port.InnerText : "any"
+        $Rules = ConvertTo-PFObject -PFObjectType "PFfirewallRule" -InputObject $InputObject
+        foreach($Rule in $Rules){
+            ("Source","Destination") | foreach {
+                $Rule.$($_+"Port") = ($Rule.$_.Port) ? $Rule.$_.Port.InnerText : "any"
 
-                    if($Rule.$_.Contains("any")){
-                        $Rule.$($_+"address") = "any"
+                if($Rule.$_.Contains("any")){
+                    $Rule.$($_+"address") = "any"
 
-                    } elseif($Rule.$_.Contains("address")) {
-                        $Rule.$($_+"address") = $Rule.$_.address.InnerText
+                } elseif($Rule.$_.Contains("address")) {
+                    $Rule.$($_+"address") = $Rule.$_.address.InnerText
 
-                    } elseif($Rule.$_.Contains("network")){
-                    if($($Rule.$_.network.InnerText).endswith("ip")){
-                        $Rule.$($_+"address") = ("{0} address" -f $Rule.$_.network.InnerText.split("ip")[0])
-                    }
-                        else{$Rule.$($_+"address") = ("{0} network" -f $Rule.$_.network.InnerText)}
-                    }
+                } elseif($Rule.$_.Contains("network")){
+                if($($Rule.$_.network.InnerText).endswith("ip")){
+                    $Rule.$($_+"address") = ("{0} address" -f $Rule.$_.network.InnerText.split("ip")[0])
+                }
+                    else{$Rule.$($_+"address") = ("{0} network" -f $Rule.$_.network.InnerText)}
                 }
             }
-        return $InputObject | out-null
+        }
+    return $Rules
     }
 }
 
@@ -479,10 +446,29 @@ function Get-PFNATRule {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
     process {
-        $InputObject | ConvertTo-PFObject -PFObjectType "PFnatRule"
-    }
+#        $InputObject | ConvertTo-PFObject -PFObjectType "PFnatRule"
+        $Rules = ConvertTo-PFObject -PFObjectType "PFnatRule" -InputObject $InputObject
+        foreach($Rule in $Rules){
+            ("Source","Destination") | foreach {
+                $Rule.$($_+"Port") = ($Rule.$_.Port) ? $Rule.$_.Port.InnerText : "any"
 
-}
+                if($Rule.$_.Contains("any")){
+                    $Rule.$($_+"address") = "any"
+
+                } elseif($Rule.$_.Contains("address")) {
+                    $Rule.$($_+"address") = $Rule.$_.address.InnerText
+
+                } elseif($Rule.$_.Contains("network")){
+                if($($Rule.$_.network.InnerText).endswith("ip")){
+                    $Rule.$($_+"address") = ("{0} address" -f $Rule.$_.network.InnerText.split("ip")[0])
+                }
+                    else{$Rule.$($_+"address") = ("{0} network" -f $Rule.$_.network.InnerText)}
+                }
+            }
+        }
+    return $Rules
+    }
+} 
 function Get-PFStaticRoute {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
@@ -496,25 +482,6 @@ function Get-PFUnbound {
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
     process {
         $InputObject | ConvertTo-PFObject -PFObjectType  "PFUnbound"
-    }
-} 
-
-function PrintPFUnbound {
-    [CmdletBinding()]
-    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
-    process {
-        $Properties = @{}
-        $Object = New-Object -TypeName "PFUnbound" -Property $Properties
-        foreach($Rule in $InputObject.WorkingObject){
-            $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
-                if($Rule.($_.name)){$Properties.($_.name) = $Rule.($_.name)}
-            }
-        }
-        if(-not $Properties.port){$Properties.port = "53"}
-        if(-not $Properties.sslport){$Properties.sslport = "853"}
-        $Object = New-Object -TypeName "PFUnbound" -Property $Properties
-        $InputObject.WorkingObject = $Object 
-        return $InputObject | out-null
     }
 } 
 
@@ -723,119 +690,3 @@ try{
 
 # Get- all config information so that we can see what's inside
 $PFServer = ($PFServer | Get-PFConfiguration -NoCache)
-
-<# test objects
-# make a clear visual distinction between this run and the previous run
-#<#
-1..30 | ForEach-Object { Write-Host "" }
-
-# works
-Write-Host "Known interfaces:" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$PFServer | Get-PFInterface | Format-table *
-
-# works
-Write-Host "LAN interface:" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$PFServer | Get-PFInterface -Name "lan" | Format-table *
-
-# works
-# TODO: separate each address/detail in a separate child object, like PFAliasEntry or something like that. Each PFAlias should then contain a collection of these.
-Write-Host "Registered aliases:" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$PFServer | Get-PFAlias | Format-table *
-
-# works
-Write-Host "Registered DHCPd servers" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$DHCPdServers = $PFServer | Get-PFDHCPd
-$DHCPdServers | Format-table *
-$DHCPdInterfaceType = ($DHCPdServers | Select-Object -First 1 -ExpandProperty Interface).GetType()
-$DHCPdInterfaceIsPFInterface = $DHCPdInterfaceType -eq [PFInterface]
-Write-Host ("Typecheck of Interface property of DHCPd server 1: {0}" -f $DHCPdInterfaceType) -ForegroundColor ($DHCPdInterfaceIsPFInterface ? "Green" : "Red")
-
-# TODO: a lot
-Write-Host "Registered static DHCP leases" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$PFServer | Get-PFDHCPStaticMap | Format-table *
-
-# TODO: source/destination
-Write-Host "All firewall rules" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-# TODO: if you want to convert System.Collections.Hashtable into something more meaningful (display only), do it here
-#       obviously creating a Write-PFFirewallRule function would be an even better idea :)
-#       DO NOT change it in the ConvertTo-PFObject function, since that will really complicate the reverse operation (changing and uploading the rule)
-$PFServer | Get-PFFirewallRule | Select-Object -ExcludeProperty Source, Destination | Format-table *
-
-# works
-Write-Host "Registered gateways" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$PFServer | Get-PFGateway | Format-table *
-
-# TODO: a lot
-Write-Host "All NAT rules" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$PFServer | Get-PFNATRule | Format-table *
-
-# TODO: mapping to PFGateway object
-Write-Host "All static routes" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$PFServer | Get-PFStaticRoute | Format-table *
-
-# TODO: mapping to PSObject 
-Write-Host "DNS server settings" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$PFServer | Get-PFUnbound | Format-table *
-
-# TODO: mapping to PSObject
-Write-Host "DNS host overrides" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
-$PFServer | Get-PFunboundHost | Format-table *
-
-Write-Host "THE END" -BackgroundColor Gray -ForegroundColor DarkGray
-exit;
-#>
-
-<# define the possible execution flows #>
-$Flow = @{
-    "alias" = @{
-        "print" = "param(`$InputObject); `$InputObject | Get-PFAlias | Format-Table *"#the star makes the format table show more than 10 column's
-    }
-
-    "gateway" = @{
-        "print" = "param(`$InputObject); `$InputObject | Get-PFGateway | Format-Table *"
-    }
-
-    "interface" = @{
-        "print" = "param(`$InputObject); `$InputObject | Get-PFInterface | Format-Table *"
-    }
-
-    "StaticRoute" = @{
-        "print" = "param(`$InputObject); `$InputObject | Get-PFStaticRoute | Format-table *"
-    }
-
-    "dnsResolver" = @{
-        "print" = "param(`$InputObject); `$InputObject | Get-PFUnbound; `$InputObject | PrintPFUnbound | Format-table *"
-    }    
-
-    "dnsResolverHost" = @{
-        "print" = "param(`$InputObject); `$InputObject | Get-PFunboundHost | Format-table *"
-    }   
-
-    "portfwd" = @{
-        "print" = "param(`$InputObject); `$InputObject | Get-PFNATRule | Format-table *"
-    }    
-    "Firewall" = @{
-        "print" = "param(`$InputObject); `$InputObject | Get-PFFirewallRule | PrintPFFirewallRule | Select-Object -ExcludeProperty Source, Destination | Format-table *" 
-    } 
-    "dhcpd" = @{
-        "print" = "param(`$InputObject); `$InputObject | Get-PFDHCPd | Format-table *" 
-    } 
-    "dhcpStaticMap" = @{
-        "print" = "param(`$InputObject); `$InputObject | Get-PFdhcpStaticMap; `$InputObject | PrintPFdhcpStaticMap | Format-table * -autosize" 
-    } 
-
-}
-
-# execute requested flow
-try{
-    if(-not $Flow.ContainsKey($Service)){  Write-Host "Unknown service '$Service'" -ForegroundColor red; exit 2 }
-    if(-not $Flow.$Service.ContainsKey($Action)){ Write-Host "Unknown action '$Action' for service '$Service'" -ForegroundColor red; exit 3 }
-
-    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer
-
-
-} catch {
-    Write-Error $_.Exception
-    exit 1    
-}
-#>

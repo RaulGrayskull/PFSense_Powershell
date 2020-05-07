@@ -48,30 +48,56 @@ class PFDHCPd{
 }
 
 class PFdhcpStaticMap{
-    [string]$interface
-#    [PFInterface[]]$Interface
-    [string]$Hostname
-    [string]$Domain
-    [string]$ClientID
-    [string]$MACaddr
-    [string]$IPaddr
-    [string]$Description
-    [string]$Gateway
-    [string]$DNSserver
-    [string]$NTPServer
+#    [string]$interface
+    [PFInterface]$Interface
+    [string[]]$Hostname
+    [string[]]$Domain
+    [string[]]$ClientID
+    [string[]]$MACaddr
+    [string[]]$IPaddr
+    [string[]]$Description
+    [string[]]$Gateway
+    [string[]]$DNSserver
+    [string[]]$NTPServer
 
-    static [string]$Section = "dhcpd/staticmap"
+    static [string]$Section = "dhcpd"
     # property name as it appears in the XML, insofar it's different from the object's property name
     static $PropertyMapping = @{
-        Interface = "../name"
-        Hostname = "Hostname"
-        Domain = "Domain"
-        ClientID = "CID"
-        IPaddr = "IPaddr"
-        Description  = "descr"
-        MACaddr  = "mac"
+        Interface = "_key"
+        Hostname = "staticmap/Hostname"
+        Domain = "staticmap/Domain"
+        ClientID = "staticmap/CID"
+        IPaddr = "staticmap/IPaddr"
+        Description  = "staticmap/descr"
+        MACaddr  = "staticmap/mac"
     }
 }
+
+# This class is only used to write the value's to the display, here the value's are in strings and not in a array of strings to improve the estatics
+class PFdhcpStaticMapWrite{
+        [PFInterface]$Interface
+        [string]$Hostname
+        [string]$Domain
+        [string]$ClientID
+        [string]$MACaddr
+        [string]$IPaddr
+        [string]$Description
+        [string]$Gateway
+        [string]$DNSserver
+        [string]$NTPServer
+    
+        static [string]$Section = "dhcpd"
+        # property name as it appears in the XML, insofar it's different from the object's property name
+        static $PropertyMapping = @{
+            Interface = "_key"
+            Hostname = "staticmap/Hostname"
+            Domain = "staticmap/Domain"
+            ClientID = "staticmap/CID"
+            IPaddr = "staticmap/IPaddr"
+            Description  = "staticmap/descr"
+            MACaddr  = "staticmap/mac"
+        }
+    }
 
 class PFFirewallRule {
     [bool]$IsFloating = $false
@@ -185,12 +211,12 @@ class PFInterface {
 }
 
 class PFNATRule {
-    [string]$SourceType
+    [hashtable]$Source
     [string]$SourceAddress
     [string]$SourcePort
-    [string]$DestType
-    [string]$DestAddress
-    [string]$DestPort
+    [hashtable]$Destination
+    [string]$DestinationAddress
+    [string]$DestinationPort
     [string]$protocol
     [string]$target
     [string]$LocalPort
@@ -202,12 +228,12 @@ class PFNATRule {
     static $PropertyMapping = @{ 
         LocalPort = "local-port"
         Description = "descr"
-        SourceType = "source/keys"
-        SourceAddress= "source/network" #ToDo: find a way for multiple options because address needs to be here as well
-        SourcePort = "source/port"
-        DestType = "destination/keys"
-        DestAddress= "destination/network"
-        DestPort = "destination/port"
+        Source = "source" 
+        SourceAddress= $null
+        SourcePort = $null
+        Destination = "destination"
+        DestAddress= $null
+        DestPort = $null
         
     }
 }

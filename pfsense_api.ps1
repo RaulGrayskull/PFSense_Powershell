@@ -112,16 +112,16 @@ function ConvertTo-PFObject{
         # To enable a single and structured approach, we need to make the hashtable key (often the Name property, but not always) 
         # available in the value (value always is a hashtable). This makes sure we can use one iterable function to iterate over all objects. 
         # The idea is that one entry in the array/hashtable equals to one PF* object, so after this, we can loop through the array and do the conversion.
-        # The hashtable key will be made available in the array as "_key"
+        # The hashtable key will be made available in the array as "_key" 
         if($ObjectToParse.GetType() -eq [hashtable]){
             $ObjectToParse.GetEnumerator() | ForEach-Object {
                 if($_.Value."_key"){ return } # this is how to simulate "continue" in a ForEach-Object block, see http://stackoverflow.com/questions/7760013/ddg#7763698
                 if($_.Value.PSObject.Methods.Name -notcontains "Add" ){ return }
 
                 $_.Value.Add("_key", $_.Key)
-            }
+            } 
         }
-
+ 
         # now iterate over all objects and convert them
         $ObjectToParse.GetEnumerator() | ForEach-Object {
             # the last step of the process will be to create a new object. We need a container with the property values for the PF* object

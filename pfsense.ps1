@@ -73,9 +73,22 @@ Function Write-PFObject{
             $Object = New-Object -TypeName "PFUnbound" -Property $Properties
             $Object | format-table *
         }
-        elseif(($PFObjectType -eq "PFFirewallRule") -or ($PFObjectType -eq "PFNATRule")){
+        elseif($PFObjectType -in ("PFFirewallRule","PFNATRule")){
             $PFObject = &"get-$PFObjectType" -Server $InputObject
             $PFObject | Select-Object -ExcludeProperty Source, Destination | Format-table *
+        }
+
+        elseif($PFObjectType -eq "PFInterface"){
+            # Don't print the internal created interface's
+            $PFObject = &"get-$PFObjectType" -Server $InputObject
+            $Properties = @{}
+            foreach($Rule in $PFObject){
+                # Real interfaces have a physical interface, if not, do not display
+                if($rule.Interface){
+                    $Collection.Add($Rule) | out-null
+                }
+            }
+            $Collection | format-table *
         }
         
         else{
@@ -160,4 +173,4 @@ try{
 } catch {
     Write-Error $_.Exception
     exit 1
-} 
+}

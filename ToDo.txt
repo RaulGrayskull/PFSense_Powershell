@@ -5,13 +5,14 @@ portfwd:
 sometime's we still get a System.Collections.Hashtable value
 
 dnsresolver:
-crashes
+crashes on pfsense_api line 121 at hosts: Cannot find an overload for "Add" and the argument count: "2"
 
 dnsresolverhosts:
-crashes
+crashes (AliasesDescription = "aliases/item/Description" still has a xmlelement)
+
 
 Interface:
-don't print internal translation name's "all, lo0, _**"
+Done
 
 alias:
 create subobject's for the entry's in a alias

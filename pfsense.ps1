@@ -99,6 +99,7 @@ Function Write-PFObject{
 
 }
 
+
 <# test objects
 # make a clear visual distinction between this run and the previous run
 #<#
@@ -158,19 +159,18 @@ $PFServer | Get-PFunboundHost | Format-table *
 
 Write-Host "THE END" -BackgroundColor Gray -ForegroundColor DarkGray
 exit;
-#>
-
-
-
+#>   
+ 
+ 
+ 
 <# execute requested flow #> 
 try{
     if(-not $Flow.ContainsKey($Service)){  Write-Host "Unknown service '$Service'" -ForegroundColor red; exit 2 }
     if(-not $Flow.$Service.ContainsKey($Action)){ Write-Host "Unknown action '$Action' for service '$Service'" -ForegroundColor red; exit 3 }
 
-    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer
-
-
-} catch {
-    Write-Error $_.Exception
+    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer 
+ 
+} catch { 
+    Write-Error $_.Exception 
     exit 1
 }

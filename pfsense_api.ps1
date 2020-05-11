@@ -93,6 +93,7 @@ function ConvertTo-PFObject{
         $PFType = (New-Object -TypeName $PFObjectType)
         $PFTypeProperties = ($PFType | Get-Member -MemberType properties).Name
         $PFTypePropertyMapping = $PFType::PropertyMapping
+        $PFTypeDelimeterMapping = $PFType::Delimeter
 
         # container for the resulting PF* objects
         $Collection = New-Object System.Collections.ArrayList        
@@ -181,16 +182,17 @@ function ConvertTo-PFObject{
                 # TODO: the || and space splitted items will be not necessary anymore after PFAlias has been refactored to contain PFAliasEntries
                 #       known issue: PFAlias property Detail is split on space, which should not happen. BUT, properties Address/Detail need to be in their own object anyway
                 # If the property is (should be) a collection but contains only one item, we might need to split them.
-                if($PropertyIsCollection -and ($PropertyValues.Count -eq 1)){
+                if($PropertyIsCollection -and ($PropertyValues.Count -eq 1)){ 
                     $PropertyValue = $PropertyValues | Select-Object -First 1
+                    $PropertyValues = $PropertyValue.split($PFTypeDelimeterMapping.$PFTypeProperty)
 
-                    foreach($Delimeter in @("||", ",", " ")){
-                        if($PropertyValue.Contains($Delimeter)){
-                            $PropertyValues = $PropertyValue.split($Delimeter)
-                            break # only split on 1 delimeter, so stop after one succesful split and do NOT continue with the other possible delimeters
-                        }
-                    }
-                }  
+#                    foreach($Delimeter in @(",", " ")){
+#                        if(($PropertyValue.Contains($Delimeter))){
+#                            $PropertyValues = $PropertyValue.split($Delimeter) 
+#                            break # only split on 1 delimeter, so stop after one succesful split and do NOT continue with the other possible delimeters
+#                       }
+#                    }
+                }   
 
                 $PropertyTypedValues = New-Object System.Collections.ArrayList
                 foreach($PropertyValue in $PropertyValues){
@@ -383,6 +385,14 @@ function Get-PFInterface {
     }
         
 }
+function Get-PFAliasEntry {
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
+    process {
+        $InputObject | ConvertTo-PFObject -PFObjectType "PFAliasEntry"
+    }
+}
+
 function Get-PFAlias {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
@@ -688,5 +698,5 @@ try{
     Write-Progress -Activity "Testing connection and your credentials" -Completed
 }
 
-# Get- all config information so that we can see what's inside
+# Get- all config information so that we can see what's inside.
 $PFServer = ($PFServer | Get-PFConfiguration -NoCache)

@@ -12,9 +12,9 @@ cert = cerificates
 class PFAlias {
     [string]$Name
     [string]$Type
-    [string[]]$Address
+#    [string[]]$Address
     [string]$Description
-    [string[]]$Detail
+#    [string[]]$Detail
  
     static [string]$Section = "aliases/alias"
     # property name as it appears in the XML, insofar it's different from the object's property name
@@ -22,6 +22,22 @@ class PFAlias {
         Description = "descr"
     }
 }
+
+class PFAliasEntry {
+    [string[]]$Detail
+    [string[]]$Address
+ 
+    static [string]$Section = "aliases/alias"
+    # property name as it appears in the XML, insofar it's different from the object's property name
+    static $PropertyMapping = @{
+        Detail = "Detail"
+    } 
+    static $Delimeter = @{
+        Detail = "||"
+        Address = " "
+    }    
+}
+
 
 class PFDHCPd{
     [PFInterface]$Interface
@@ -70,6 +86,15 @@ class PFdhcpStaticMap{
         IPaddr = "staticmap/IPaddr"
         Description  = "staticmap/descr"
         MACaddr  = "staticmap/mac"
+    }
+    static $Delimeter = @{
+        Interface = ","
+        Hostname = ","
+        Domain = ","
+        ClientID = ","
+        IPaddr = ",r"
+        Description  = ","
+        MACaddr  = ","
     }
 }
 

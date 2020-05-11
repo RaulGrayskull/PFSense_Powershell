@@ -3,6 +3,10 @@ $Flow = @{
         "print" = "param(`$InputObject); Write-PFObject -InputObject `$InputObject -PFObjectType PFAlias"
     }
 
+    "AliasEntry"  = @{
+        "print" = "param(`$InputObject); Write-PFObject -InputObject `$InputObject -PFObjectType PFAliasEntry"
+    }
+
     "gateway" = @{
         "print" = "param(`$InputObject); Write-PFObject -InputObject `$InputObject -PFObjectType PFGateway"
 #        "print" = "param(`$InputObject); `$InputObject | Get-PFGateway | Format-Table *"

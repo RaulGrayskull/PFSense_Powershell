@@ -118,7 +118,7 @@ function ConvertTo-PFObject{
             $ObjectToParse.GetEnumerator() | ForEach-Object {
                 if($_.Value."_key"){ return } # this is how to simulate "continue" in a ForEach-Object block, see http://stackoverflow.com/questions/7760013/ddg#7763698
                 if($_.Value.PSObject.Methods.Name -notcontains "Add" ){ return }
-
+#                if($_.Value.gettype() -ne [Hashtable]){return} # to make dnsresolver not crash, now we need te get the value's we need
                 $_.Value.Add("_key", $_.Key)
             } 
         }
@@ -184,21 +184,15 @@ function ConvertTo-PFObject{
                 # If the property is (should be) a collection but contains only one item, we might need to split them.
                 if($PropertyIsCollection -and ($PropertyValues.Count -eq 1)){ 
                     $PropertyValue = $PropertyValues | Select-Object -First 1
+                    if(-not $PFTypeDelimeterMapping.$PFTypeProperty){}
+                    elseif($Null -eq $PFTypeDelimeterMapping.$PFTypeProperty){$PFTypeDelimeterMapping.$PFTypeProperty = ","}
                     $PropertyValues = $PropertyValue.split($PFTypeDelimeterMapping.$PFTypeProperty)
-
-#                    foreach($Delimeter in @(",", " ")){
-#                        if(($PropertyValue.Contains($Delimeter))){
-#                            $PropertyValues = $PropertyValue.split($Delimeter) 
-#                            break # only split on 1 delimeter, so stop after one succesful split and do NOT continue with the other possible delimeters
-#                       }
-#                    }
                 }   
 
                 $PropertyTypedValues = New-Object System.Collections.ArrayList
                 foreach($PropertyValue in $PropertyValues){
                     switch($PropertyType){
-                        # TODO: PFGateway
-                        #"PFGateway"     { $PropertyTypedValue = $InputObject | Get-PFGateway -Name $Item } 
+                        "PFGateway"     { $PropertyTypedValue = $InputObject | Get-PFGateway -Name $PropertyValue } 
                         "PFInterface"   { $PropertyTypedValue = $InputObject | Get-PFInterface -Name $PropertyValue }
                         "bool"          { $PropertyTypedValue = ([bool]$PropertyValue -or ($PropertyValue -in ('yes', 'true', 'checked'))) }
                         default         { $PropertyTypedValue = $PropertyValue }
@@ -224,6 +218,44 @@ function ConvertTo-PFObject{
         
         # return the collection with PF* objects
         return $Collection
+    }
+}
+
+function ConvertFrom-PFObject{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)][PFServer]$InputObject,
+        [Parameter(Mandatory=$true)]$PFObject
+    )
+    begin{
+        $PFObjecttype = $PFObject[0].gettype()
+        $PFType = (New-Object -TypeName $PFObjecttype)
+        $PFTypeProperties = ($PFType | Get-Member -MemberType properties).Name
+        $PFTypePropertyMapping = $PFType::PropertyMapping
+        $PFTypeDelimeterMapping = $PFType::Delimeter
+    }
+    process{
+        # first we need the original pfobject and then edit the part we gave back
+        $ReturnObject = $InputObject | Get-PFConfiguration
+        $path = "PSConfig"
+        foreach($line in ($PFType::section).Split("/")){
+            $path = "{0}.{1}" -f $path,$line
+        }
+
+        $ReturnObject.PSConfig.staticroutes.route
+        $ReturnObject.$path
+
+        foreach($PFObjectEntry in $PFObject){
+            foreach($key in $PFObjectEntry.Keys){
+                $Key
+            }
+
+#            foreach($ObjectToReturn in $ReturnObject.PSConfig.staticroutes.route){
+#                $PFObjectEntry
+#                $ObjectToReturn
+#            }
+        }
+
     }
 }
 
@@ -350,6 +382,9 @@ function Get-PFInterface {
         $InterfacesFromConfig = $InputObject |  ConvertTo-PFObject -PFObjectType "PFInterface"
         $InterfacesFromConfig | ForEach-Object { $Interfaces.Add($_) | Out-Null }
         
+        # Invert the Enable Bool, if the interface is enabled it has a enable with no value, if the interface is disabled it has no enbale field in the xml field. The default value in de class is $true, if no enable field is found it stay's true and thus disabled
+        $Interfaces | ForEach-Object {$_.Enable = -not $_.Enable}
+
         # add the IPv6 LinkLocal name and description so these can be translated
         $InterfacesFromConfig.GetEnumerator() | ForEach-Object {
             $Properties = @{
@@ -385,22 +420,33 @@ function Get-PFInterface {
     }
         
 }
-function Get-PFAliasEntry {
-    [CmdletBinding()]
-    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
-    process {
-        $InputObject | ConvertTo-PFObject -PFObjectType "PFAliasEntry"
-    }
-}
-
 function Get-PFAlias {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
     process {
-        $InputObject | ConvertTo-PFObject -PFObjectType "PFAlias"
+        $Lines = ConvertTo-PFObject -PFObjectType "PFAlias" -InputObject $InputObject
+        foreach($Line in $Lines){
+            $index = 0
+            $Properties = @{}
+            $Object = New-Object -TypeName "PFAliasEntry" -Property $Properties
+            while($Line._address[$Index]){
+                $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
+                    $Property = $_.Name
+                    try {$PropertyValue = $Line.$Property[$index]}
+                    catch{$PropertyValue = $Line.$Property}
+    
+                    $Properties.$Property = $PropertyValue
+                }
+                $Object = New-Object -TypeName "PFAliasEntry" -Property $Properties
+                $line.Entry = $line.Entry + $Object
+                $index++
+            }
+        }
+        return $Lines
     }
 }
- 
+
+
 function Get-PFDHCPd {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
@@ -418,7 +464,7 @@ function Get-PFDHCPStaticMap {
 }
 
 
-function Get-PFFirewallRule {
+function Get-PFFirewall {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
     process {
@@ -435,9 +481,9 @@ function Get-PFFirewallRule {
 
                 } elseif($Rule.$_.Contains("network")){
                 if($($Rule.$_.network.InnerText).endswith("ip")){
-                    $Rule.$($_+"address") = ("{0} address" -f $Rule.$_.network.InnerText.split("ip")[0])
+                    $Rule.$($_+"address") = ("{0} address" -f (get-pfinterface -name ($Rule.$_.network.InnerText.split("ip")[0]) -server $InputObject))
                 }
-                    else{$Rule.$($_+"address") = ("{0} network" -f $Rule.$_.network.InnerText)}
+                    else{$Rule.$($_+"address") = ("{0} network" -f (get-pfinterface -name ($Rule.$_.network.InnerText.split("ip")[0]) -server $InputObject))}
                 }
             }
         }
@@ -447,11 +493,38 @@ function Get-PFFirewallRule {
 
 function Get-PFGateway {
     [CmdletBinding()]
-    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
+    param (
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$false)][string]$Name
+        )
     process {
-        $InputObject | ConvertTo-PFObject -PFObjectType "PFGateway"
+#        $InputObject | ConvertTo-PFObject -PFObjectType "PFGateway"
+        $Gateways = ConvertTo-PFObject -PFObjectType "PFGateway" -InputObject $InputObject
+        $Interfaces = get-pfinterface -server $InputObject
+        $Object = (New-Object -TypeName "PFGateway")
+        foreach($interface in $interfaces){
+            $Properties = @{}
+            ("DHCP","DHCP6") | foreach{
+                if($_ -in ($interface.IPv4Address,$interface.IPv6Address)){
+                    $Properties.name = "{0}_{1}" -f $interface.Description,$_
+                    $Properties.Description = "Interface {0}_{1} Gateway" -f $interface.Description,$_
+                    $Properties.Interface = $interface
+                    $Object = New-Object -TypeName "PFGateway" -Property $Properties
+                    # If the dhcp gateway is eddited by the users, it already excists in the gatewayobjects if it is not in there we neet to add it, the name is a unique identifier
+                    if($gateways.name -NotContains $object.name){$Gateways = $Gateways + $Object}
+                }
+            }
+        }
+        if([string]::IsNullOrWhitespace($Name)){
+            return $Gateways
+        
+        # return the $Interfaces, filtered by Name -eq $Name
+        } else {           
+            return ($Gateways | Where-Object { $_.Name -eq $Name })
+        }
     }
 }
+
 function Get-PFNATRule {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
@@ -469,10 +542,10 @@ function Get-PFNATRule {
                     $Rule.$($_+"address") = $Rule.$_.address.InnerText
 
                 } elseif($Rule.$_.Contains("network")){
-                if($($Rule.$_.network.InnerText).endswith("ip")){
-                    $Rule.$($_+"address") = ("{0} address" -f $Rule.$_.network.InnerText.split("ip")[0])
-                }
-                    else{$Rule.$($_+"address") = ("{0} network" -f $Rule.$_.network.InnerText)}
+                    if($($Rule.$_.network.InnerText).endswith("ip")){
+                        $Rule.$($_+"address") = ("{0} address" -f (get-pfinterface -name ($Rule.$_.network.InnerText.split("ip")[0]) -server $InputObject))
+                    }
+                    else{$Rule.$($_+"address") = ("{0} network" -f (get-pfinterface -name ($Rule.$_.network.InnerText.split("ip")[0]) -server $InputObject))}
                 }
             }
         }
@@ -659,44 +732,3 @@ function TestPFCredential {
         return $true
     }    
 }
-
-## BEGIN OF CONTROLLER LOGIC, should be moved to a different script later in order to be able to dotsource this file in your own scripts.
-# since debugging dotsourced files s*, leave it here for now until we're ready for a first release
-# TODO: create a switch for the program to skip this contoller logic and be able to test dotsourcing this file in your own scripts too.
-Clear-Host
-
-$PFServer = New-Object PFServer -Property @{
-    Address = $Server
-    NoTLS = $NoTLS
-    SkipCertificateCheck = $SkipCertificateCheck
-}
-
-# Warn the user if no TLS encryption is used
-if($PFServer.NoTLS){
-    Write-Warning "Your administrative level credentials are being transmitted over an INSECURE connection!"
-}
-
-# Test credentials before we continue.
-Write-Progress -Activity "Testing connection and your credentials" -Status "Connecting..." -PercentComplete -1
-try{
-    if(-not [string]::IsNullOrWhiteSpace($Username)){
-        if(-not [string]::IsNullOrWhiteSpace($InsecurePassword)){
-            $Password = ConvertTo-SecureString -String $InsecurePassword -AsPlainText -Force
-            $PFServer.Credential = New-Object System.Management.Automation.PSCredential($Username, $Password) 
-
-        } else {
-            $PFServer.Credential = Get-Credential -UserName $Username
-        }
-    }
-    while(-not (TestPFCredential -Server $PFServer)){ $PFServer.Credential = Get-Credential }
-
-} catch [System.TimeoutException] {
-    Write-Error -Message $_.Exception.Message
-    exit 4
-
-} finally {
-    Write-Progress -Activity "Testing connection and your credentials" -Completed
-}
-
-# Get- all config information so that we can see what's inside.
-$PFServer = ($PFServer | Get-PFConfiguration -NoCache)

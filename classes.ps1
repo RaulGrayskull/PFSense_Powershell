@@ -1,41 +1,31 @@
-# classes to build:
-<#
-dhcpd = Needs static mapping
-dhcpdv6
-syslog
-load_balancer
-openvpn
-unbound = dnsresolver <= strange things happen here
-cert = cerificates
-#>
-
 class PFAlias {
     [string]$Name
     [string]$Type
-#    [string[]]$Address
+    [string[]]$_Address
     [string]$Description
-#    [string[]]$Detail
+    [string[]]$_Detail
+    [PFAliasEntry[]]$Entry
  
     static [string]$Section = "aliases/alias"
     # property name as it appears in the XML, insofar it's different from the object's property name
     static $PropertyMapping = @{
         Description = "descr"
+        _Detail = "Detail"
+        _Address = "Address"
     }
+    static $Delimeter = @{
+        _Detail = "||"
+        _Address = " "
+    }   
 }
 
 class PFAliasEntry {
-    [string[]]$Detail
-    [string[]]$Address
- 
-    static [string]$Section = "aliases/alias"
-    # property name as it appears in the XML, insofar it's different from the object's property name
-    static $PropertyMapping = @{
-        Detail = "Detail"
-    } 
-    static $Delimeter = @{
-        Detail = "||"
-        Address = " "
-    }    
+    [string]$_Detail
+    [string]$_Address
+
+    [string] ToString(){
+        return ("{0} : {1}" -f $this._Detail,$this._Address)
+    }
 }
 
 
@@ -47,7 +37,34 @@ class PFDHCPd{
     [string]$Domain
     [string]$Gateway
     [string]$DNSServer
-    [string]$NTPServer    
+    [string]$NTPServer
+#   New Lines
+    [string]$ddnsdomainkeyalgorithm
+    [string]$ddnsdomainprimary              
+    [string]$domainsearchlist               
+    [string]$filename64                     
+    [string]$ddnsdomainkey                  
+    [string]$ddnsdomainkeyname              
+    [string]$nextserver                     
+    [string]$tftp
+    [string]$maxleasetime                                      
+    [string]$ddnsdomain                     
+    [string]$ldap                           
+    [string]$failover_peerip                                         
+    [string]$filename                       
+    [string]$enable                         
+    [string]$pool                           
+    [string]$filename32                     
+    [string]$mac_allow                      
+    [string]$numberoptions                  
+    [string]$dhcpleaseinlocaltime           
+    [string]$defaultleasetime               
+    [string]$ddnsclientupdates              
+    [string]$mac_deny                       
+    [string]$staticmap                                          
+    [string]$rootpath                       
+
+
 
     static [string]$Section = "dhcpd"
     # property name as it appears in the XML, insofar it's different from the object's property name
@@ -64,7 +81,6 @@ class PFDHCPd{
 }
 
 class PFdhcpStaticMap{
-#    [string]$interface
     [PFInterface]$Interface
     [string[]]$Hostname
     [string[]]$Domain
@@ -75,6 +91,18 @@ class PFdhcpStaticMap{
     [string[]]$Gateway
     [string[]]$DNSserver
     [string[]]$NTPServer
+    [string[]]$rootpath
+    [string[]]$ldap
+    [string[]]$tftp
+    [string[]]$filename
+    [string[]]$maxleasetime
+    [string[]]$domainsearchlist
+    [string[]]$ddnsdomainkey
+    [string[]]$ddnsdomainprimary
+    [string[]]$defaultleasetime
+    [string[]]$ddnsdomainkeyname
+    [string[]]$ddnsdomain
+# New lines    
 
     static [string]$Section = "dhcpd"
     # property name as it appears in the XML, insofar it's different from the object's property name
@@ -86,15 +114,21 @@ class PFdhcpStaticMap{
         IPaddr = "staticmap/IPaddr"
         Description  = "staticmap/descr"
         MACaddr  = "staticmap/mac"
-    }
-    static $Delimeter = @{
-        Interface = ","
-        Hostname = ","
-        Domain = ","
-        ClientID = ","
-        IPaddr = ",r"
-        Description  = ","
-        MACaddr  = ","
+        Gateway = "staticmap/Gateway"
+#        DNSserver = "staticmap/DNSserver"
+#        NTPServer = "staticmap/NTPServer"
+# New lines
+        rootpath = "staticmap/rootpath"
+        ldap = "staticmap/ldap"
+        tftp = "staticmap/tftp"
+        filename = "staticmap/filename"
+        maxleasetime = "staticmap/maxleasetime"
+        domainsearchlist = "staticmap/domainsearchlist"
+        ddnsdomainkey = "staticmap/ddnsdomainkey"
+        ddnsdomainprimary = "staticmap/ddnsdomainprimary"
+        defaultleasetime = "staticmap/defaultleasetime"
+        ddnsdomainkeyname = "staticmap/ddnsdomainkeyname"
+        ddnsdomain = "staticmap/ddnsdomain"
     }
 }
 
@@ -108,20 +142,12 @@ class PFdhcpStaticMapWrite{
         [string]$IPaddr
         [string]$Description
         [string]$Gateway
-        [string]$DNSserver
+        [string[]]$DNSserver
         [string]$NTPServer
     
         static [string]$Section = "dhcpd"
         # property name as it appears in the XML, insofar it's different from the object's property name
-        static $PropertyMapping = @{
-            Interface = "_key"
-            Hostname = "staticmap/Hostname"
-            Domain = "staticmap/Domain"
-            ClientID = "staticmap/CID"
-            IPaddr = "staticmap/IPaddr"
-            Description  = "staticmap/descr"
-            MACaddr  = "staticmap/mac"
-        }
+        static $PropertyMapping = @{}
     }
 
 class PFFirewallRule {
@@ -133,12 +159,10 @@ class PFFirewallRule {
         [string]$Type
     [ValidateSet('inet', 'inet6', 'inet46')]
         [string]$IPProtocol
-#    [PFInterface[]]$interface
     [PFInterface[]]$interface
     [ValidateSet('tcp', 'udp', 'tcp/udp', 'icmp', 'esp', 'ah', 'gre', 'ipv6', 
                  'igmp', 'pim', 'ospf', 'tp', 'carp', 'pfsync', '')]
         [string]$Protocol
-#    [ValidateSet('network', 'address', 'any')]
     [hashtable]$Source
     [string]$SourceAddress
     [string]$SourcePort
@@ -146,6 +170,22 @@ class PFFirewallRule {
     [string]$DestinationAddress
     [string]$DestinationPort
     [string]$Description
+# new lines
+    [string]$statetype
+    [string]$direction
+    [string]$os
+    [string]$tag
+    [string]$maxsrcstates
+    [string]$icmptype
+    [string]$created
+    [string]$tracker
+    [string]$max
+    [string]$updated
+    [string]$tagged
+    [string]$statetimeout
+    [string]$maxsrcnodes
+    [string]$maxsrcconn
+    [string]$associatedruleid
 
     static [string]$Section = "filter/rule"
     # property name as it appears in the XML, insofar it's different from the object's property name
@@ -161,6 +201,14 @@ class PFFirewallRule {
         Destination = "destination"
         DestAddress= $null
         DestPort = $null
+        # New lines
+        maxsrcstates = "max-src-states"
+        maxsrcnodes = "max-src-nodes"
+        maxsrcconn = "max-src-conn"
+        associatedruleid = "associated-rule-id"
+    }
+    static $Delimeter = @{
+        interface = ","
     }
 }
 
@@ -178,11 +226,10 @@ class PFFirewallSeparator {
 }
 
 class PFGateway {
-#    [PFInterface[]]$interface
+    [string]$Name    
     [PFInterface]$Interface
     [string]$Gateway
     [string]$Monitor
-    [string]$Name
     [string]$Weight
     [string]$IPProtocol
     [string]$Description
@@ -192,15 +239,21 @@ class PFGateway {
     static $PropertyMapping = @{
         Description = "descr"
     }
+    [string] ToString(){
+        return $this.Name
+    }
 }
 
 class PFInterface {
+    [bool]$Enable = $True
     [ValidateNotNullOrEmpty()][string]$Name
-    [string]$Interface
     [string]$Description
-    [string]$IPv4Address    # should be [ipaddress] object, but that's for later, is a native powershell object
+    [string]$Interface
+    [string]$Spoofmac
+    [string]$IPv4Address    # should be [ipaddress] object, but that's for later, a interface can have dhcp as ipaddress and that crashes the internal ipaddress class
+#    [IPAddress]$IPv4Address
     [string]$IPv4Subnet
-    [string]$IPv4Gateway    # should be [PFGateway] object, but that's for later
+    [string]$IPv4Gateway    # should be [PFGateway] object, but that's for later; this creates a loop because we need the interfaces to create the dhcp gateway's 
     [string]$IPv6Address    # should be [ipaddress] object, but that's for later
     [string]$IPv6Subnet
     [string]$IPv6Gateway    # should be [PFGateway] object, but that's for later
@@ -211,6 +264,8 @@ class PFInterface {
     [string]$MediaOpt
     [string]$DHCPv6DUID
     [string]$DHCPv6IAPDLEN
+    
+    
 
     static [string]$Section = "interfaces"
     # property name as it appears in the XML, insofar it's different from the object's property name
@@ -245,8 +300,11 @@ class PFNATRule {
     [string]$protocol
     [string]$target
     [string]$LocalPort
-    [string]$interface
+    [PFinterface]$interface
     [string]$Description
+    [String]$updated
+    [String]$AssociatedFirewall # could be a PFFirewall object
+    [String]$created
 
     static [string]$Section = "nat/rule"
     # property name as it appears in the XML, insofar it's different from the object's property name
@@ -259,7 +317,7 @@ class PFNATRule {
         Destination = "destination"
         DestAddress= $null
         DestPort = $null
-        
+        AssociatedFirewall = "associated-rule-id"
     }
 }
 
@@ -279,7 +337,7 @@ class PFServer {
 
 class PFStaticRoute {
     [string]$Network
-    [string]$Gateway    # should be [PFGateway] object, but that's for later
+    [PFGateway]$Gateway    # should be [PFGateway] object, but that's for later
     [string]$Description
     
     static [string]$Section = "staticroutes/route"
@@ -290,10 +348,8 @@ class PFStaticRoute {
 }
 
 class PFUnbound {
-    [string[]]$ActiveInterface
-    [string[]]$OutgoingInterface
-    #[PFInterface[]]$ActiveInterface
-    #[PFInterface[]]$OutgoingInterface
+    [string]$ActiveInterface
+    [string]$OutgoingInterface
     [bool]$dnssec
     [bool]$enable
     [int]$port
@@ -310,9 +366,9 @@ class PFUnboundHost {
     [string]$Hostname
     [string]$Domain
     [string]$IPaddr
-    [string[]]$AliasesHost
-    [string[]]$AliasesDomain
-    [string[]]$AliasesDescription
+    [string]$AliasesHost
+    [string]$AliasesDomain
+    [string]$AliasesDescription
 
     static [string]$Section = "unbound/hosts"
     static $PropertyMapping = @{ 

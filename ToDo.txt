@@ -1,18 +1,32 @@
-portfwd and firewall:
-translate the source and destination opt1 to userdefined name's
+Alias:
+Done
 
-portfwd:
-sometime's we still get a System.Collections.Hashtable value
+Dhcpd:
+Done
 
-dnsresolver:
+DhcpStaticMap:
+Display's dns and ntp of the dhcp-pool, if enabled in class this error: Method invocation failed because [System.Collections.Hashtable] does not contain a method named 'Split'
+
+DnsResolver:
 crashes on pfsense_api line 121 at hosts: Cannot find an overload for "Add" and the argument count: "2"
 
-dnsresolverhosts:
+DnsResolverHost:
 crashes (AliasesDescription = "aliases/item/Description" still has a xmlelement)
+It looks to happen if a host has no aliases
 
+Firewall:
+Done
+
+Gateway:
+Done
 
 Interface:
 Done
 
-alias:
-create subobject's for the entry's in a alias
+Portfwd:
+AssociatedFirewall could be a PFFirewall Object
+
+StaticRoute:
+write-pfstaticroute
+
+

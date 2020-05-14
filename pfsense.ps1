@@ -13,7 +13,7 @@ Param
 # TODO: make this a bit nicer, with error handling and stuff
 if (Get-Module -ListAvailable -Name XmlRpc) {
     Write-Host "Module exists"
-}  
+}   
 else {
     Install-Module -Name XmlRpc
 }
@@ -24,81 +24,191 @@ else {
 . .\flow.ps1
 
 
-Function Write-PFObject{
+Function Write-PFAlias{
     [CmdletBinding()]
-    param (
-        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
-        [Parameter(Mandatory=$true)]$PFObjectType
-        )
-    begin{
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
         $Collection = New-Object System.Collections.ArrayList
+        $Object = (New-Object -TypeName "PFAlias")
     }
-    process {
-        if($PFObjectType -eq "PFdhcpStaticMap"){
-            $Object = (New-Object -TypeName "PFdhcpStaticMapWrite")
-            $PFObject = &"get-$PFObjectType" -Server $InputObject
-            foreach($Staticmap in $PFObject){
-                $indexStaticMap = 0 
-                $Properties = @{}
-                # Here we loop true all the entry's of the array's of the same interface, I use the MACaddr because this is a mandatory entry.
-                while($Staticmap.MACaddr[$indexStaticMap]){
-                    $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
-                        $Property = $_.Name
-                        if($Property -eq "interface"){$PropertyValue = $Staticmap.interface}
-                        else{
-                            try {$PropertyValue = $Staticmap.$Property[$indexStaticMap]}
-                            catch{$PropertyValue = $Staticmap.$Property}
-                        }
-                        $Properties.$Property = $PropertyValue
-                    }
-                    $Object = New-Object -TypeName "PFdhcpStaticMapWrite" -Property $Properties
-                    $Collection.Add($Object) | Out-Null
-                    $indexStaticMap++
-                }
-    
-            }
-            $Collection | format-table
-        }
-        elseif($PFObjectType -eq "PFUnbound"){
-            $PFObject = &"get-$PFObjectType" -Server $InputObject
+    process{
+        $PFObject = get-pfalias -Server $InputObject
+        foreach($AliasEntry in $PFObject){
+            $indexAliasEntry = 0
             $Properties = @{}
-            $Object = New-Object -TypeName "PFUnbound" -Property $Properties
-            foreach($Rule in $PFObject){
+            while($AliasEntry.Entry[$indexAliasEntry]){
                 $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
-                    if($Rule.($_.name)){$Properties.($_.name) = $Rule.($_.name)}
+                $Property = $_.Name
+                if($indexAliasEntry -eq 0){
+                    if($Property -eq "Entry"){$PropertyValue = $AliasEntry.$Property[$indexAliasEntry]}
+                    else{$PropertyValue = $AliasEntry.$Property}
                 }
-            }
-            if(-not $Properties.port){$Properties.port = "53"}
-            if(-not $Properties.sslport){$Properties.sslport = "853"}
-            $Object = New-Object -TypeName "PFUnbound" -Property $Properties
-            $Object | format-table *
-        }
-        elseif($PFObjectType -in ("PFFirewallRule","PFNATRule")){
-            $PFObject = &"get-$PFObjectType" -Server $InputObject
-            $PFObject | Select-Object -ExcludeProperty Source, Destination | Format-table *
-        }
-
-        elseif($PFObjectType -eq "PFInterface"){
-            # Don't print the internal created interface's
-            $PFObject = &"get-$PFObjectType" -Server $InputObject
-            $Properties = @{}
-            foreach($Rule in $PFObject){
-                # Real interfaces have a physical interface, if not, do not display
-                if($rule.Interface){
-                    $Collection.Add($Rule) | out-null
+                else{
+                    if($Property -eq "Entry"){
+                        try {$PropertyValue = $AliasEntry.$Property[$indexAliasEntry]}
+                        catch{$PropertyValue = $AliasEntry.$Property}
+                    }
+                    else{
+                        $PropertyValue = "" 
+                    }
                 }
+                $Properties.$Property = $PropertyValue
             }
-            $Collection | format-table *
+            $Object = New-Object -TypeName "PFAlias" -Property $Properties
+            $Collection.Add($Object) | Out-Null
+            $indexAliasEntry++
         }
-        
-        else{
-            $PFObject = &"get-$PFObjectType" -Server $InputObject
-            $PFObject | format-table *
-        }
+    }
+    $exclude = ("_Address", "_Detail")
+    $Collection | Select-Object -ExcludeProperty $exclude | Format-table *
     }
 
 }
 
+Function Write-PFDHCPd{
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+    }
+    process{
+        $PFObject = get-pfdhcpd -Server $InputObject
+        $exclude = ("ddnsdomainkeyalgorithm","ddnsdomainprimary","domainsearchlist","filename64","ddnsdomainkey","ddnsdomainkeyname","nextserver","tftp","maxleasetime","ddnsdomain","ldap","failover_peerip","filename","enable","pool","filename32","mac_allow","numberoptions","dhcpleaseinlocaltime","defaultleasetime","ddnsclientupdates","mac_deny","staticmap","rootpath")
+        $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
+    }
+}
+Function Write-PFDHCPstaticmap{
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+        $Collection = New-Object System.Collections.ArrayList
+        $Object = (New-Object -TypeName "PFdhcpStaticMapWrite")
+    }
+    process{
+        $PFObject = get-PFDHCPStaticMap -Server $InputObject
+        foreach($Staticmap in $PFObject){
+            $indexStaticMap = 0 
+            $Properties = @{}
+            # Here we loop true all the entry's of the array's of the same interface, I use the MACaddr because this is a mandatory entry.
+            while($Staticmap.MACaddr[$indexStaticMap]){
+                $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
+                    $Property = $_.Name
+                    if($Property -eq "interface"){$PropertyValue = $Staticmap.interface}
+                    else{
+                        try {$PropertyValue = $Staticmap.$Property[$indexStaticMap]}
+                        catch{$PropertyValue = $Staticmap.$Property}
+                    }
+                    $Properties.$Property = $PropertyValue
+                }
+                $Object = New-Object -TypeName "PFdhcpStaticMapWrite" -Property $Properties
+                $Collection.Add($Object) | Out-Null
+                $indexStaticMap++
+            } 
+
+        }
+        $Collection | format-table
+    }
+}
+
+Function Write-PFUnbound{
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+        $Object = (New-Object -TypeName "PFdhcpStaticMapWrite")
+    }
+    process{
+        $PFObject = Get-PFUnbound -Server $InputObject
+        $Properties = @{}
+        $Object = New-Object -TypeName "PFUnbound" -Property $Properties
+        foreach($Rule in $PFObject){
+            $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
+                if($Rule.($_.name)){$Properties.($_.name) = $Rule.($_.name)}
+            }
+        }
+        if(-not $Properties.port){$Properties.port = "53"}
+        if(-not $Properties.sslport){$Properties.sslport = "853"}
+        $Object = New-Object -TypeName "PFUnbound" -Property $Properties
+        $Object | format-table *
+    }
+}
+
+Function Write-PFUnboundHost{
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+    }
+    process{
+        $PFObject = get-PFunboundHost -Server $InputObject
+        $exclude = ("")
+        $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
+    }
+}
+
+Function Write-PFFirewall{
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+    }
+    process{
+        $PFObject = get-PFFirewall -Server $InputObject
+        $exclude = ("statetype","direction","os","tag","maxsrcstates","icmptype","created","max","updated","tagged","statetimeout","maxsrcnodes","maxsrcconn","Source","Destination","tracker","associatedruleid")
+        $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
+    }
+}
+
+Function Write-PFGateway{
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+    }
+    process{
+        $PFObject = get-pfgateway -Server $InputObject
+        $exclude = ("")
+        $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
+    }
+}
+
+
+Function Write-PFInterface{
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+        $Collection = New-Object System.Collections.ArrayList
+    }
+    process{
+        $PFObject = get-pfinterface -Server $InputObject
+        foreach($Rule in $PFObject){
+            # Real interfaces have a physical interface, if not, do not display
+            if($rule.Interface){
+                $Collection.Add($Rule) | out-null
+            }
+        }
+        $Collection | format-table *
+    }
+}
+
+Function Write-PFNatRule{
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+    }
+    process{
+        $PFObject = get-PFNATRule -Server $InputObject
+        $exclude = ("Source","Destination","updated","created")
+        $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
+    }
+}
+
+Function Write-PFStaticRoute{
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+    }
+    process{
+        $PFObject = get-PFStaticroute -Server $InputObject
+        $exclude = ("")
+        $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
+    }
+}
 
 <# test objects
 # make a clear visual distinction between this run and the previous run
@@ -142,7 +252,7 @@ Write-Host "Registered gateways" -NoNewline -BackgroundColor Gray -ForegroundCol
 $PFServer | Get-PFGateway | Format-table *
 
 # TODO: a lot
-Write-Host "All NAT rules" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
+Write-Host "All NAT rules" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray 
 $PFServer | Get-PFNATRule | Format-table *
 
 # TODO: mapping to PFGateway object
@@ -160,7 +270,49 @@ $PFServer | Get-PFunboundHost | Format-table *
 Write-Host "THE END" -BackgroundColor Gray -ForegroundColor DarkGray
 exit;
 #>   
- 
+
+
+## BEGIN OF CONTROLLER LOGIC, should be moved to a different script later in order to be able to dotsource this file in your own scripts.
+# since debugging dotsourced files s*, leave it here for now until we're ready for a first release
+# TODO: create a switch for the program to skip this contoller logic and be able to test dotsourcing this file in your own scripts too.
+
+Clear-Host
+
+$PFServer = New-Object PFServer -Property @{
+    Address = $Server
+    NoTLS = $NoTLS
+    SkipCertificateCheck = $SkipCertificateCheck
+}
+
+# Warn the user if no TLS encryption is used
+if($PFServer.NoTLS){
+    Write-Warning "Your administrative level credentials are being transmitted over an INSECURE connection!"
+}
+
+# Test credentials before we continue.
+Write-Progress -Activity "Testing connection and your credentials" -Status "Connecting..." -PercentComplete -1
+try{
+    if(-not [string]::IsNullOrWhiteSpace($Username)){
+        if(-not [string]::IsNullOrWhiteSpace($InsecurePassword)){
+            $Password = ConvertTo-SecureString -String $InsecurePassword -AsPlainText -Force
+            $PFServer.Credential = New-Object System.Management.Automation.PSCredential($Username, $Password) 
+
+        } else {
+            $PFServer.Credential = Get-Credential -UserName $Username
+        }
+    }
+    while(-not (TestPFCredential -Server $PFServer)){ $PFServer.Credential = Get-Credential }
+
+} catch [System.TimeoutException] {
+    Write-Error -Message $_.Exception.Message
+    exit 4
+
+} finally {
+    Write-Progress -Activity "Testing connection and your credentials" -Completed
+}
+
+# Get- all config information so that we can see what's inside.
+$PFServer = ($PFServer | Get-PFConfiguration -NoCache)
  
  
 <# execute requested flow #> 
@@ -174,3 +326,6 @@ try{
     Write-Error $_.Exception 
     exit 1
 }
+
+#$PFObject = Get-PFStaticRoute -Server $PFserver
+#ConvertFrom-PFObject -InputObject $PFserver -PFObject $PFObject

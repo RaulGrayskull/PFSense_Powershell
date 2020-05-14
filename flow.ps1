@@ -1,44 +1,37 @@
 $Flow = @{
     "alias" = @{
-        "print" = "param(`$InputObject); Write-PFObject -InputObject `$InputObject -PFObjectType PFAlias"
+        "print" = "param(`$InputObject); Write-PFAlias -InputObject `$InputObject"
     }
 
-    "AliasEntry"  = @{
-        "print" = "param(`$InputObject); Write-PFObject -InputObject `$InputObject -PFObjectType PFAliasEntry"
-    }
+    "dhcpd" = @{
+        "print" = "param(`$InputObject); Write-PFDHCPd -InputObject `$InputObject"
+    } 
+    "dhcpStaticMap" = @{
+        "print" = "param(`$InputObject); Write-PFDHCPstaticmap -InputObject `$InputObject"
+    }  
+    "dnsResolver" = @{
+        "print" = "param(`$InputObject); Write-PFUnbound -InputObject `$InputObject"
+    }    
+    "dnsResolverHost" = @{
+        "print" = "param(`$InputObject); Write-PFUnboundHost -InputObject `$InputObject"
+    }   
+    "Firewall" = @{
+        "print" = "param(`$InputObject); Write-PFFirewall -InputObject `$InputObject"
+    } 
 
     "gateway" = @{
-        "print" = "param(`$InputObject); Write-PFObject -InputObject `$InputObject -PFObjectType PFGateway"
-#        "print" = "param(`$InputObject); `$InputObject | Get-PFGateway | Format-Table *"
+        "print" = "param(`$InputObject); Write-PFGateway -InputObject `$InputObject"
     }
 
     "interface" = @{
-        "print" = "param(`$InputObject); Write-PFObject -InputObject `$InputObject -PFObjectType PFInterface"
+        "print" = "param(`$InputObject); Write-PFInterface -InputObject `$InputObject"
     }
+
+    "portfwd" = @{
+        "print" = "param(`$InputObject); Write-PFNatRule -InputObject `$InputObject"
+    }    
 
     "StaticRoute" = @{
-        "print" = "param(`$InputObject); Write-PFObject -InputObject `$InputObject -PFObjectType PFStaticRoute"
+        "print" = "param(`$InputObject); Write-PFStaticRoute -InputObject `$InputObject"
     }
-
-    "dnsResolver" = @{
-        "print" = "param(`$InputObject); Write-PFObject -InputObject `$InputObject -PFObjectType PFUnbound"
-    }    
-
-    "dnsResolverHost" = @{
-        "print" = "param(`$InputObject); Write-PFObject -InputObject `$InputObject -PFObjectType PFUnboundHost"
-    }   
- 
-    "portfwd" = @{
-        "print" = "param(`$InputObject); Write-PFObject -InputObject `$InputObject -PFObjectType PFNATRule"
-    }    
-    "Firewall" = @{
-        "print" = "param(`$InputObject); Write-PFObject -InputObject `$InputObject -PFObjectType PFFirewallRule"
-    } 
-    "dhcpd" = @{
-        "print" = "param(`$InputObject); Write-PFObject -InputObject `$InputObject -PFObjectType PFDHCPd"
-    } 
-    "dhcpStaticMap" = @{
-        "print" = "param(`$InputObject); Write-PFObject -InputObject `$InputObject -PFObjectType PFDHCPStaticMap"
-    }  
-
 }

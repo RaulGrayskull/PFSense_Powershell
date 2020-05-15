@@ -194,6 +194,7 @@ function ConvertTo-PFObject{
                     switch($PropertyType){
                         "PFGateway"     { $PropertyTypedValue = $InputObject | Get-PFGateway -Name $PropertyValue } 
                         "PFInterface"   { $PropertyTypedValue = $InputObject | Get-PFInterface -Name $PropertyValue }
+                        "PFFirewall"    { if($PropertyValue){$PropertyTypedValue = $InputObject | Get-PFFirewall -associatedruleid $PropertyValue }} # If Propertyvalue is empty, no associated rule is created and it is a empty field, and that crashes the get-pffirewall
                         "bool"          { $PropertyTypedValue = ([bool]$PropertyValue -or ($PropertyValue -in ('yes', 'true', 'checked'))) }
                         default         { $PropertyTypedValue = $PropertyValue }
                     }
@@ -466,9 +467,12 @@ function Get-PFDHCPStaticMap {
 
 function Get-PFFirewall {
     [CmdletBinding()]
-    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
+    param (
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$false)][string]$associatedruleid
+        )
     process {
-        $Rules = ConvertTo-PFObject -PFObjectType "PFfirewallRule" -InputObject $InputObject
+        $Rules = ConvertTo-PFObject -PFObjectType "PFFirewall" -InputObject $InputObject
         foreach($Rule in $Rules){
             ("Source","Destination") | foreach {
                 $Rule.$($_+"Port") = ($Rule.$_.Port) ? $Rule.$_.Port.InnerText : "any"
@@ -487,7 +491,11 @@ function Get-PFFirewall {
                 }
             }
         }
-    return $Rules
+        if([string]::IsNullOrWhitespace($associatedruleid)){
+            return $Rules
+        } else {           
+            return ($Rules | Where-Object { $_.associatedruleid -eq $associatedruleid })
+        }
     }
 }
 
@@ -498,7 +506,6 @@ function Get-PFGateway {
         [Parameter(Mandatory=$false)][string]$Name
         )
     process {
-#        $InputObject | ConvertTo-PFObject -PFObjectType "PFGateway"
         $Gateways = ConvertTo-PFObject -PFObjectType "PFGateway" -InputObject $InputObject
         $Interfaces = get-pfinterface -server $InputObject
         $Object = (New-Object -TypeName "PFGateway")
@@ -515,10 +522,12 @@ function Get-PFGateway {
                 }
             }
         }
+        (@{ Null4 = 'Null4'; Null6 = 'Null6' }).GetEnumerator() | ForEach-Object {
+            $EphemeralGateway =  New-Object -TypeName "PFGateway" -Property @{ Name = $_.Key; Description = $_.Value }
+            $Gateways = $Gateways + $EphemeralGateway
+        }
         if([string]::IsNullOrWhitespace($Name)){
             return $Gateways
-        
-        # return the $Interfaces, filtered by Name -eq $Name
         } else {           
             return ($Gateways | Where-Object { $_.Name -eq $Name })
         }
@@ -529,7 +538,6 @@ function Get-PFNATRule {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
     process {
-#        $InputObject | ConvertTo-PFObject -PFObjectType "PFnatRule"
         $Rules = ConvertTo-PFObject -PFObjectType "PFnatRule" -InputObject $InputObject
         foreach($Rule in $Rules){
             ("Source","Destination") | foreach {

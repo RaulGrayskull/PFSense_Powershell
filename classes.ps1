@@ -150,7 +150,7 @@ class PFdhcpStaticMapWrite{
         static $PropertyMapping = @{}
     }
 
-class PFFirewallRule {
+class PFFirewall {
     [bool]$IsFloating = $false
     [bool]$IsQuick = $false
     [bool]$IsDisabled = $false
@@ -210,6 +210,10 @@ class PFFirewallRule {
     static $Delimeter = @{
         interface = ","
     }
+    [string] ToString(){
+        return ("{0}:{1} -> {2}:{3}" -f $this.SourceAddress,$this.SourcePort,$this.DestAddress,$this.DestPort)
+    }
+    
 }
 
 class PFFirewallSeparator {
@@ -303,7 +307,8 @@ class PFNATRule {
     [PFinterface]$interface
     [string]$Description
     [String]$updated
-    [String]$AssociatedFirewall # could be a PFFirewall object
+    [PFFirewall]$FirewallRule
+#    [String]$FirewallRule # could be a PFFirewall object
     [String]$created
 
     static [string]$Section = "nat/rule"
@@ -317,7 +322,7 @@ class PFNATRule {
         Destination = "destination"
         DestAddress= $null
         DestPort = $null
-        AssociatedFirewall = "associated-rule-id"
+        FirewallRule = "associated-rule-id"
     }
 }
 

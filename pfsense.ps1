@@ -159,11 +159,18 @@ Function Write-PFGateway{
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
     Begin{
+        $Collection = New-Object System.Collections.ArrayList
     }
     process{
         $PFObject = get-pfgateway -Server $InputObject
         $exclude = ("")
-        $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
+        foreach($Rule in $PFObject){
+            # Real interfaces have a physical interface, if not, do not display
+            if($rule.Interface){
+                $Collection.Add($Rule) | out-null
+            }
+        }
+        $Collection | Select-Object -ExcludeProperty $exclude | Format-table *
     }
 }
 
@@ -243,9 +250,9 @@ $PFServer | Get-PFDHCPStaticMap | Format-table *
 # TODO: source/destination
 Write-Host "All firewall rules" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray
 # TODO: if you want to convert System.Collections.Hashtable into something more meaningful (display only), do it here
-#       obviously creating a Write-PFFirewallRule function would be an even better idea :)
+#       obviously creating a Write-PFFirewall function would be an even better idea :)
 #       DO NOT change it in the ConvertTo-PFObject function, since that will really complicate the reverse operation (changing and uploading the rule)
-$PFServer | Get-PFFirewallRule | Select-Object -ExcludeProperty Source, Destination | Format-table *
+$PFServer | Get-PFFirewall | Select-Object -ExcludeProperty Source, Destination | Format-table *
 
 # works
 Write-Host "Registered gateways" -NoNewline -BackgroundColor Gray -ForegroundColor DarkGray

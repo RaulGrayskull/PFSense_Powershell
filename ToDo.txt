@@ -27,6 +27,7 @@ Portfwd:
 AssociatedFirewall could be a PFFirewall Object
 
 StaticRoute:
-write-pfstaticroute
+Done
+
 
 

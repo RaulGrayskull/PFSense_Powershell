@@ -337,7 +337,7 @@ class PFServer {
 
 class PFStaticRoute {
     [string]$Network
-    [PFGateway]$Gateway    # should be [PFGateway] object, but that's for later
+    [PFGateway]$Gateway
     [string]$Description
     
     static [string]$Section = "staticroutes/route"

@@ -15,19 +15,20 @@ crashes (AliasesDescription = "aliases/item/Description" still has a xmlelement)
 It looks to happen if a host has no aliases
 
 Firewall:
-Done
+if not valid or no assoiated rule, return $NUll
 
 Gateway:
-Done
+Done, if filterd on non excisting return $NULL
 
 Interface:
-Done
+Done, if filterd on non excisting return $NULL
 
 Portfwd:
-AssociatedFirewall could be a PFFirewall Object
+Done
 
 StaticRoute:
 Done
 
 
+# Next, Return DHCPD to make _Key
 

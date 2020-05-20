@@ -194,7 +194,7 @@ function ConvertTo-PFObject{
                     switch($PropertyType){
                         "PFGateway"     { $PropertyTypedValue = $InputObject | Get-PFGateway -Name $PropertyValue } 
                         "PFInterface"   { $PropertyTypedValue = $InputObject | Get-PFInterface -Name $PropertyValue }
-                        "PFFirewall"    { if($PropertyValue){$PropertyTypedValue = $InputObject | Get-PFFirewall -associatedruleid $PropertyValue }} # If Propertyvalue is empty, no associated rule is created and it is a empty field, and that crashes the get-pffirewall
+                        "PFFirewall"    { if($PropertyValue){$PropertyTypedValue = $InputObject | Get-PFFirewall -associatedruleid $PropertyValue }} # If Propertyvalue is empty, no associated rule is created and it is a empty field, get-pffirewall then try's to return all the rule's and that crashes the script
                         "bool"          { $PropertyTypedValue = ([bool]$PropertyValue -or ($PropertyValue -in ('yes', 'true', 'checked'))) }
                         default         { $PropertyTypedValue = $PropertyValue }
                     }
@@ -231,33 +231,45 @@ function ConvertFrom-PFObject{
     begin{
         $PFObjecttype = $PFObject[0].gettype()
         $PFType = (New-Object -TypeName $PFObjecttype)
-        $PFTypeProperties = ($PFType | Get-Member -MemberType properties).Name
         $PFTypePropertyMapping = $PFType::PropertyMapping
         $PFTypeDelimeterMapping = $PFType::Delimeter
+        $PFSection = $PFType::section
     }
     process{
-        # first we need the original pfobject and then edit the part we gave back
-        $ReturnObject = $InputObject | Get-PFConfiguration
-        $path = "PSConfig"
-        foreach($line in ($PFType::section).Split("/")){
-            $path = "{0}.{1}" -f $path,$line
-        }
-
-        $ReturnObject.PSConfig.staticroutes.route
-        $ReturnObject.$path
-
+#        $PFHashValue = New-Object -TypeName "System.Collections.ArrayList" #It needs to be a array and not a ArrayList
+        [array]$PFHashValue = "" # first we create a empty array
         foreach($PFObjectEntry in $PFObject){
-            foreach($key in $PFObjectEntry.Keys){
-                $Key
+            $PFHashValueEntry = @{}
+            Foreach($Property in $PFObjectEntry.psobject.Properties){
+                $XMLProperty = $PFTypePropertyMapping.$($Property.name) ? $PFTypePropertyMapping.$($Property.name) : $Property.name.ToLower()
+                switch($Property.TypeNameOfValue){
+                    "PFGateway"     { $PropertyTypedValue = $Property.value.name } 
+#                    "PFInterface"   {}
+#                    "PFFirewall"    {}
+#                    "bool"          {}
+                    default         { $PropertyTypedValue = $Property.value}
+                }
+                $PFHashValueEntry.add($XMLProperty,$PropertyTypedValue)
             }
-
-#            foreach($ObjectToReturn in $ReturnObject.PSConfig.staticroutes.route){
-#                $PFObjectEntry
-#                $ObjectToReturn
-#            }
+            if([string]::IsNullOrWhitespace($PFHashValue)){$PFHashValue = $PFHashValueEntry} # If the Array is empty (First round), we fill it with the hashtable of $PFHashValueEntry
+            else{$PFHashValue += $PFHashValueEntry} # If the Array has a value (Second or more), we add the $PFHashValueEntry
         }
+        if($PFTypePropertyMapping -contains "_Key"){
+            $PFHashTableName = "_Key" # ToDo: Make the Name of the entry be the $PFHashTableName if the value is _Key
+            $PFXMLSection = $PFSection
+        }
+        else{
+            $PFHashTableName = $($PFSection.Split("/")[-1])
+            $PFXMLSection = $($PFSection.Split("/")[-2])
+        }
+        $PFHashTable = @{$PFHashTableName = $PFHashValue}    
+        $InputObject.PSConfig.$PFXMLSection = $PFHashTable # ToDo: This only works for 1 or 2 layers deep for now and only if the 1 layer has _key in the propertymapping
+        [xml]$XMLToUpload = ConvertTo-XmlRpcType -InputObject $InputObject.PSConfig
+        $XMLToUpload.Save("NewAll.xml") # Temporary save to easaly open the xml file in a more visual editor, This should be the command to upload to the PFsense 
 
+       return $test
     }
+    
 }
 
 function FormatXml {
@@ -416,7 +428,10 @@ function Get-PFInterface {
         
         # return the $Interfaces, filtered by Name -eq $Name
         } else {           
-            return ($Interfaces | Where-Object { $_.Name -eq $Name })
+            if($Name -in $Interfaces.Name){ #This does work to check if the name exists.
+                return ($Interfaces | Where-Object { $_.Name -eq $Name })
+            }
+            else{return $Null}
         }
     }
         
@@ -493,8 +508,11 @@ function Get-PFFirewall {
         }
         if([string]::IsNullOrWhitespace($associatedruleid)){
             return $Rules
-        } else {           
-            return ($Rules | Where-Object { $_.associatedruleid -eq $associatedruleid })
+        } else {
+            if($associatedruleid -in $Rules.associatedruleid){
+                return ($Rules | Where-Object { $_.associatedruleid -eq $associatedruleid })
+            }
+            else{return $Null}
         }
     }
 }
@@ -529,7 +547,10 @@ function Get-PFGateway {
         if([string]::IsNullOrWhitespace($Name)){
             return $Gateways
         } else {           
-            return ($Gateways | Where-Object { $_.Name -eq $Name })
+            if($Name -in $Gateways.Name){
+                return ($Gateways | Where-Object { $_.Name -eq $Name })
+            }
+            else{return $Null}
         }
     }
 }
@@ -568,13 +589,29 @@ function Get-PFStaticRoute {
     }
 }
 
+function Set-PFStaticRoute {
+    <#
+    Make the PFobject ready to send to the ConvertFrom-PFObject.
+    In this case it is already done, but in other cases we need to do some tweaking just like the get-pf functions.
+    to keep the flows the same i still choise to add this function and not send it to the ConfertFrom-PFObject directly.
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
+        [Parameter(Mandatory=$true)][psobject]$NewObject)
+    process{
+        ConvertFrom-PFObject -InputObject $InputObject -PFObject $NewObject
+    }    
+}
+
 function Get-PFUnbound {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
     process {
         $InputObject | ConvertTo-PFObject -PFObjectType  "PFUnbound"
     }
-} 
+}
+
 
 function Get-PFunboundHost {
     [CmdletBinding()]

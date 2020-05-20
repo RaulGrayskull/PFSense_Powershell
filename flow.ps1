@@ -33,5 +33,6 @@ $Flow = @{
 
     "StaticRoute" = @{
         "print" = "param(`$InputObject); Write-PFStaticRoute -InputObject `$InputObject"
+        "Add" = "param(`$InputObject,`$Network,`$Gateway,`$Description) ; Add-PFStaticRoute -InputObject `$InputObject -Network `$Network -Gateway `$Gateway -Description `$Description"
     }
 }

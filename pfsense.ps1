@@ -5,6 +5,9 @@ Param
     [Parameter(Mandatory=$false, HelpMessage='The Password')] [string] $InsecurePassword,
     [Parameter(Mandatory=$false, HelpMessage='The service you would like to talke to')] [string] $Service,
     [Parameter(Mandatory=$false, HelpMessage='The action you would like to do on the service')] [string] $Action,
+    [Parameter(Mandatory=$false, HelpMessage='The Network value')] [string] $Network,
+    [Parameter(Mandatory=$false, HelpMessage='The Gateway name')] [string] $Gateway,
+    [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Description,
     [Switch] $NoTLS,
     [switch] $SkipCertificateCheck
     )
@@ -217,6 +220,30 @@ Function Write-PFStaticRoute{
     }
 }
 
+Function Add-PFStaticRoute{
+    <#
+    Create a new PFStaticRoute object with the value's you would like to add
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$true)][String]$Network,
+        [Parameter(Mandatory=$true)][String]$Gateway,
+        [Parameter(Mandatory=$true)][String]$Description
+    )
+    Process{
+        $PFObject = Get-PFStaticRoute -Server $PFserver
+        $Properties = @{
+            Network = $Network
+            Gateway = $($InputObject | Get-PFGateway -Name $Gateway)
+            Description = $Description
+        }
+        $new = New-Object -TypeName "PFStaticRoute" -Property $Properties
+        $PFObject = $PFObject + $new
+        ConvertFrom-PFObject -InputObject $PFserver -PFObject $PFObject
+    }
+}
+
 <# test objects
 # make a clear visual distinction between this run and the previous run
 #<#
@@ -327,12 +354,10 @@ try{
     if(-not $Flow.ContainsKey($Service)){  Write-Host "Unknown service '$Service'" -ForegroundColor red; exit 2 }
     if(-not $Flow.$Service.ContainsKey($Action)){ Write-Host "Unknown action '$Action' for service '$Service'" -ForegroundColor red; exit 3 }
 
-    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer 
+    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer,$Network,$Gateway,$Description 
  
 } catch { 
     Write-Error $_.Exception 
     exit 1
 }
 
-#$PFObject = Get-PFStaticRoute -Server $PFserver
-#ConvertFrom-PFObject -InputObject $PFserver -PFObject $PFObject

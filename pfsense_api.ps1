@@ -237,39 +237,64 @@ function ConvertFrom-PFObject{
     }
     process{
 #        $PFHashValue = New-Object -TypeName "System.Collections.ArrayList" #It needs to be a array and not a ArrayList
-        [array]$PFHashValue = "" # first we create a empty array
+        $PFHashTableName = "" # Make sure the PFHashTableName is empty
+        [string]$PFHashValue = "" # Make the $PFHashvalue a string
+        $PFTypePropertyMapping.GetEnumerator() | foreach { # If the hashtable has a entry with the value _key, retype $PFHashValue as a hashtable
+            if($_.value -eq "_key"){
+                [Hashtable]$PFHashValue = @{}
+            }
+        }
+        if($PFHashValue.gettype() -ne [hashtable]){[array]$PFHashValue = ""} # If $PFHashValue is not a hashtable, it should be a array.
         foreach($PFObjectEntry in $PFObject){
             $PFHashValueEntry = @{}
             Foreach($Property in $PFObjectEntry.psobject.Properties){
+                [string]$PropertyTypedValue = ""
                 $XMLProperty = $PFTypePropertyMapping.$($Property.name) ? $PFTypePropertyMapping.$($Property.name) : $Property.name.ToLower()
                 switch($Property.TypeNameOfValue){
-                    "PFGateway"     { $PropertyTypedValue = $Property.value.name } 
-#                    "PFInterface"   {}
+                    "PFGateway"     { $PropertyTypedValueConverted = $Property.value.name } 
+                    "PFInterface"   { $PropertyTypedValueConverted = $Property.value.Description}
 #                    "PFFirewall"    {}
 #                    "bool"          {}
-                    default         { $PropertyTypedValue = $Property.value}
+                    default         { $PropertyTypedValueConverted = $Property.value}
                 }
-                $PFHashValueEntry.add($XMLProperty,$PropertyTypedValue)
+                if($XMLProperty -match "/"){
+                    [hashtable]$PropertyTypedValue = @{}
+                    $PropertyTypedValue.add($($XMLProperty.Split("/"))[-1],$PropertyTypedValueConverted) 
+                    [array]$PropertyTypedValueArray = $PropertyTypedValue
+                    if($PFHashValueEntry.$($($XMLProperty.Split("/"))[-2])){$PFHashValueEntry.$($($XMLProperty.Split("/"))[-2]) = $PFHashValueEntry.$($($XMLProperty.Split("/"))[-2]) + $PropertyTypedValueArray}
+                    else{$PFHashValueEntry.add($($XMLProperty.Split("/"))[-2],$PropertyTypedValueArray)}
+                }
+                else{
+                    $PFHashValueEntry.add($XMLProperty,$PropertyTypedValueConverted)
+                }
+                
             }
-            if([string]::IsNullOrWhitespace($PFHashValue)){$PFHashValue = $PFHashValueEntry} # If the Array is empty (First round), we fill it with the hashtable of $PFHashValueEntry
-            else{$PFHashValue += $PFHashValueEntry} # If the Array has a value (Second or more), we add the $PFHashValueEntry
+            if($PFHashValue.gettype() -ne [hashtable]){ # If $PFHashValue is a array add $PFHashValueEntry (In most cases)
+                if([string]::IsNullOrWhitespace($PFHashValue)){$PFHashValue = $PFHashValueEntry} # If the Array is empty (First round), we fill it with the hashtable of $PFHashValueEntry
+                else{$PFHashValue += $PFHashValueEntry} # If the Array has a value (Second or more), we add the $PFHashValueEntry
+            }
+            elseif($PFHashValue.gettype() -eq [hashtable]){ # If $PFHashValue is a hashtable, add $PFHashValueEntry as value to the _key as key
+                $PFTypePropertyMapping.GetEnumerator() | foreach {
+                    if($_.value -eq "_key"){
+                        $PFHashTableName = $PFObjectEntry.$($_.name).name
+                        $PFHashValue.add($PFHashTableName,$PFHashValueEntry)
+                    }
+                }
+            }
         }
-        if($PFTypePropertyMapping -contains "_Key"){
-            $PFHashTableName = "_Key" # ToDo: Make the Name of the entry be the $PFHashTableName if the value is _Key
-            $PFXMLSection = $PFSection
-        }
-        else{
+        # ToDo: This only works for 1 or 2 layers deep for now and only if the 1 layer has _key in the propertymapping
+        if($PFSection.Split("/")[1]){
             $PFHashTableName = $($PFSection.Split("/")[-1])
             $PFXMLSection = $($PFSection.Split("/")[-2])
+            $InputObject.PSConfig.$PFXMLSection = @{$PFHashTableName = $PFHashValue}
         }
-        $PFHashTable = @{$PFHashTableName = $PFHashValue}    
-        $InputObject.PSConfig.$PFXMLSection = $PFHashTable # ToDo: This only works for 1 or 2 layers deep for now and only if the 1 layer has _key in the propertymapping
+        else{
+            $InputObject.PSConfig.$PFSection = $PFHashValue
+        }
         [xml]$XMLToUpload = ConvertTo-XmlRpcType -InputObject $InputObject.PSConfig
         $XMLToUpload.Save("NewAll.xml") # Temporary save to easaly open the xml file in a more visual editor, This should be the command to upload to the PFsense 
-
        return $test
     }
-    
 }
 
 function FormatXml {
@@ -382,7 +407,8 @@ function Get-PFInterface {
     [OutputType([PFInterface[]])]
     param (
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject,
-        [Parameter(Mandatory=$false)][string]$Name
+        [Parameter(Mandatory=$false)][string]$Name,
+        [Parameter(Mandatory=$false)][string]$Description
     )   
     process { 
         # TODO: for performance reasons, you might want to consider a check if the interfaces exist already. In that case, you can simply return the existing version already.
@@ -423,18 +449,22 @@ function Get-PFInterface {
 
         # return section
         # return all the interfaces if no $Name parameter was given
-        if([string]::IsNullOrWhitespace($Name)){
+        if(([string]::IsNullOrWhitespace($Name)) -and ([string]::IsNullOrWhitespace($Description))){
             return $Interfaces
-        
-        # return the $Interfaces, filtered by Name -eq $Name
-        } else {           
+        }
+        elseif($Name){# return the $Interfaces, filtered by Name -eq $Name
             if($Name -in $Interfaces.Name){ #This does work to check if the name exists.
                 return ($Interfaces | Where-Object { $_.Name -eq $Name })
             }
             else{return $Null}
         }
+        elseif($Description){
+            if($Description -in $Interfaces.Description){ #This does work to check if the Description exists.
+                return ($Interfaces | Where-Object { $_.Description -eq $Description })
+            }
+            else{return $Null}
+        }
     }
-        
 }
 function Get-PFAlias {
     [CmdletBinding()]
@@ -469,7 +499,23 @@ function Get-PFDHCPd {
     process {
         $InputObject | ConvertTo-PFObject -PFObjectType "PFDHCPd"
     }
-} 
+}
+
+function Set-PFDHCPd {
+    <#
+    Make the PFobject ready to send to the ConvertFrom-PFObject.
+    In this case it is already done, but in other cases we need to do some tweaking just like the get-pf functions.
+    to keep the flows the same i still choise to add this function and not send it to the ConfertFrom-PFObject directly.
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
+        [Parameter(Mandatory=$true)][psobject]$NewObject)
+    process{
+        ConvertFrom-PFObject -InputObject $InputObject -PFObject $NewObject
+    }    
+}
+
 
 function Get-PFDHCPStaticMap {
     [CmdletBinding()]

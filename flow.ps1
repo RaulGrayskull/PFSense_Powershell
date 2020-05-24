@@ -5,6 +5,7 @@ $Flow = @{
 
     "dhcpd" = @{
         "print" = "param(`$InputObject); Write-PFDHCPd -InputObject `$InputObject"
+        "Add" = "param(`$InputObject,`$Network,`$Gateway,`$Description) ; Add-PFDHCPd -InputObject `$InputObject -Interface `$Interface -From `$From -To `$To -netmask `$netmask -Domain `$Domain -Gateway `$Gateway -DNSServer `$DNSServer -NTPServer `$NTPServer "
     } 
     "dhcpStaticMap" = @{
         "print" = "param(`$InputObject); Write-PFDHCPstaticmap -InputObject `$InputObject"

@@ -35,6 +35,7 @@ class PFDHCPd{
     [string]$RangeTo
     [string]$netmask
     [string]$Domain
+#    [PFGateway]$Gateway
     [string]$Gateway
     [string]$DNSServer
     [string]$NTPServer

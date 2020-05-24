@@ -8,6 +8,13 @@ Param
     [Parameter(Mandatory=$false, HelpMessage='The Network value')] [string] $Network,
     [Parameter(Mandatory=$false, HelpMessage='The Gateway name')] [string] $Gateway,
     [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Description,
+    [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Interface,
+    [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $From,
+    [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $To,
+    [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $netmask,
+    [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Domain,
+    [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $DNSServer,
+    [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $NTPServer,
     [Switch] $NoTLS,
     [switch] $SkipCertificateCheck
     )
@@ -66,6 +73,47 @@ Function Write-PFAlias{
     $Collection | Select-Object -ExcludeProperty $exclude | Format-table *
     }
 
+}
+Function Add-PFDHCPd{
+    <#
+    Create a new PFStaticRoute object with the value's you would like to add
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$true)][String]$Gateway,
+        [Parameter(Mandatory=$false, HelpMessage='The Interface the DHCPd listen on')] [string]$Interface,
+        [Parameter(Mandatory=$false, HelpMessage='The Starting ip address of the pool')] [string]$From,
+        [Parameter(Mandatory=$false, HelpMessage='The Last IP address of the pool')] [string]$To,
+        [Parameter(Mandatory=$false, HelpMessage='The Netmask used by the pool')] [string]$netmask,
+        [Parameter(Mandatory=$false, HelpMessage='The Domain')] [string]$Domain,
+        [Parameter(Mandatory=$false, HelpMessage='The DNSServer used bij the pool')] [string]$DNSServer,
+        [Parameter(Mandatory=$false, HelpMessage='The NTPServer used bij the pool')] [string]$NTPServer
+    )
+    Process{
+        $PFObject = Get-PFdhcpd -Server $PFserver
+
+        $Properties = @{
+            Gateway = $($InputObject | Get-PFGateway -Name $Gateway)
+            Interface = $($InputObject | Get-PFInterface -Description $Interface)
+            RangeFrom = $From
+            RangeTo = $To
+            netmask = $netmask
+            Domain = $Domain
+            DNSServer = $DNSServer
+            NTPServer = $NTPServer
+        }
+        $new = New-Object -TypeName "PFDHCPd" -Property $Properties
+        if($new.Interface.Description -in $PFObject.Interface.Description){
+            $Index = 0
+            While($PFObject[$index]){
+                if($PFObject[$index].Interface.Description -eq $new.Interface.Description){$PFObject[$index] = $new}
+                $index++
+            }
+        }
+        else{$PFObject = $PFObject + $new}
+        ConvertFrom-PFObject -InputObject $PFserver -PFObject $PFObject
+    }
 }
 
 Function Write-PFDHCPd{
@@ -207,19 +255,6 @@ Function Write-PFNatRule{
         $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
     }
 }
-
-Function Write-PFStaticRoute{
-    [CmdletBinding()]
-    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
-    Begin{
-    }
-    process{
-        $PFObject = get-PFStaticroute -Server $InputObject
-        $exclude = ("")
-        $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
-    }
-}
-
 Function Add-PFStaticRoute{
     <#
     Create a new PFStaticRoute object with the value's you would like to add
@@ -243,6 +278,19 @@ Function Add-PFStaticRoute{
         ConvertFrom-PFObject -InputObject $PFserver -PFObject $PFObject
     }
 }
+Function Write-PFStaticRoute{
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+    }
+    process{
+        $PFObject = get-PFStaticroute -Server $InputObject
+        $exclude = ("")
+        $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
+    }
+}
+
+
 
 <# test objects
 # make a clear visual distinction between this run and the previous run
@@ -354,7 +402,7 @@ try{
     if(-not $Flow.ContainsKey($Service)){  Write-Host "Unknown service '$Service'" -ForegroundColor red; exit 2 }
     if(-not $Flow.$Service.ContainsKey($Action)){ Write-Host "Unknown action '$Action' for service '$Service'" -ForegroundColor red; exit 3 }
 
-    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer,$Network,$Gateway,$Description 
+    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer,$Network,$Gateway,$Description,$Interface,$From,$To,$netmask,$Domain,$DNSServer,$NTPServer
  
 } catch { 
     Write-Error $_.Exception 

@@ -2,7 +2,7 @@ Alias:
 Done
 
 Dhcpd:
-Done
+ConfertFrom - staticmap is System.Collections.Hashtable in xml and not the value's
 
 DhcpStaticMap:
 Display's dns and ntp of the dhcp-pool, if enabled in class this error: Method invocation failed because [System.Collections.Hashtable] does not contain a method named 'Split'

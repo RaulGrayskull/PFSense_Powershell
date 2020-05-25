@@ -36,4 +36,7 @@ $Flow = @{
         "print" = "param(`$InputObject); Write-PFStaticRoute -InputObject `$InputObject"
         "Add" = "param(`$InputObject,`$Network,`$Gateway,`$Description) ; Add-PFStaticRoute -InputObject `$InputObject -Network `$Network -Gateway `$Gateway -Description `$Description"
     }
+    "Vlan" = @{
+        "print" = "param(`$InputObject); Write-PFVlan -InputObject `$InputObject"
+    }
 }

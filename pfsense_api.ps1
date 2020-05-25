@@ -667,6 +667,15 @@ function Get-PFunboundHost {
     }
 }
 
+function Get-PFVlan {
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
+    process {
+        $InputObject | ConvertTo-PFObject -PFObjectType "PFVlan"
+    }
+}
+
+
 function Invoke-PFXMLRPCRequest {
     <#
     .DESCRIPTION

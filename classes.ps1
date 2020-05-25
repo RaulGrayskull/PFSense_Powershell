@@ -386,3 +386,20 @@ class PFUnboundHost {
         AliasesDescription = "aliases/item/Description"
     }
 }
+
+
+class PFVlan {
+    [string]$interface
+    [string]$Tag
+    [string]$vlanif
+    [string]$Priority
+    [string]$Description
+
+    static [string]$Section = "vlans/vlan"
+    static $PropertyMapping = @{
+        interface = "if"
+        Tag = "tag"
+        Description = "descr"
+        Priority = "pcp"
+    }
+}

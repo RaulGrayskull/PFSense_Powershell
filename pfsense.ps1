@@ -290,7 +290,17 @@ Function Write-PFStaticRoute{
     }
 }
 
-
+Function Write-PFVlan{
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+    }
+    process{
+        $PFObject = get-PFVlan -Server $InputObject
+        $exclude = ("vlanif")
+        $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
+    }
+}
 
 <# test objects
 # make a clear visual distinction between this run and the previous run

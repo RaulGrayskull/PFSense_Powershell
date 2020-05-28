@@ -8,13 +8,20 @@ Param
     [Parameter(Mandatory=$false, HelpMessage='The Network value')] [string] $Network,
     [Parameter(Mandatory=$false, HelpMessage='The Gateway name')] [string] $Gateway,
     [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Description,
-    [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Interface,
-    [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $From,
-    [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $To,
-    [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $netmask,
-    [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Domain,
-    [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $DNSServer,
-    [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $NTPServer,
+    [Parameter(Mandatory=$false, HelpMessage='The Interface')] [string] $Interface,
+    [Parameter(Mandatory=$false, HelpMessage='The Starting point')] [string] $From,
+    [Parameter(Mandatory=$false, HelpMessage='The End point')] [string] $To,
+    [Parameter(Mandatory=$false, HelpMessage='The Network IPv4 our IPv6 inclusing /subnet')] [string] $netmask,
+    [Parameter(Mandatory=$false, HelpMessage='The Domain')] [string] $Domain,
+    [Parameter(Mandatory=$false, HelpMessage='The IP address of the DNS Server')] [string] $DNSServer,
+    [Parameter(Mandatory=$false, HelpMessage='The IP address of the NTP Server')] [string] $NTPServer,
+    [Parameter(Mandatory=$false, HelpMessage='The Alias Name')] [string] $Alias,
+    [Parameter(Mandatory=$false, HelpMessage='Type')] [string] $Type,
+    [Parameter(Mandatory=$false, HelpMessage='Address')] [string] $Address,
+    [Parameter(Mandatory=$false, HelpMessage='Detail - not the description')] [string] $Detail,
+    [Parameter(Mandatory=$false, HelpMessage='Hostname')] [string] $HostName,
+    [Parameter(Mandatory=$false, HelpMessage='Client ID')] [string] $ClientID,
+    [Parameter(Mandatory=$false, HelpMessage='Mac Address')] [string] $MacAddr,
     [Switch] $NoTLS,
     [switch] $SkipCertificateCheck
     )
@@ -33,6 +40,112 @@ else {
 <# . source the possible execution flows #>
 . .\flow.ps1
 
+Function Add-PFAlias{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$true, HelpMessage='The Alias Name')][string]$Alias,
+        [Parameter(Mandatory=$true, HelpMessage='Type')][string]$Type,
+        [Parameter(Mandatory=$false, HelpMessage='Address')] [string] $Address,
+        [Parameter(Mandatory=$false, HelpMessage='Detail - not the description')] [string] $Detail,
+        [Parameter(Mandatory=$true)][String]$Description
+    )
+    Process{
+        $Properties = @{
+            _Address = $Address
+            _Detail = $Detail
+        }
+        $EntryObject = New-Object -TypeName "PFAliasEntry" -Property $Properties
+        $Properties = @{
+            Name = $Alias
+            Type = $Type
+            Description = $Description
+            Entry = $EntryObject
+        }
+        $NewObject = New-Object -TypeName "PFAlias" -Property $Properties
+        $PFObject = Get-PFAlias -Server $PFserver
+        if($NewObject.name -in $PFObject.name){
+            $Index = 0
+            While($PFObject[$index]){
+                if($PFObject[$index].name -eq $NewObject.name){$PFObject[$index] = $NewObject}
+                $index++
+            }
+        }
+        else{$PFObject = $PFObject + $NewObject}
+        Set-PFAlias -InputObject $PFserver -PFObject $PFObject
+    }
+}
+Function AddEntry-PFAlias{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$true, HelpMessage='The Alias Name')][string]$Alias,
+        [Parameter(Mandatory=$false, HelpMessage='Address')] [string] $Address,
+        [Parameter(Mandatory=$false, HelpMessage='Detail - not the description')] [string] $Detail
+    )
+    Process{
+        $Properties = @{
+            _Address = $Address
+            _Detail = $Detail
+        }
+        $EntryObject = New-Object -TypeName "PFAliasEntry" -Property $Properties
+        $PFObject = Get-PFAlias -Server $PFserver
+        if($Alias -in $PFObject.name){
+            $Index = 0
+            While($PFObject[$index]){
+                if($PFObject[$index].name -eq $Alias){$PFObject[$index].entry += ($EntryObject)}
+                $index++
+            }
+        }
+        else{
+            Write-Error "$Alias Was not found, could not add $EntryObject"
+            exit 6
+    }
+        Set-PFAlias -InputObject $PFserver -PFObject $PFObject
+    }
+}
+
+Function Delete-PFAlias{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$true, HelpMessage='The Alias Name')][string]$Alias
+    )
+    $PFObject = Get-PFAlias -Server $PFserver
+    if($Alias -in $PFObject.name){
+        $PFObject = $PFObject | where {$Alias -ne $_.name}
+    }
+    Else{
+        Write-Error -Message "$Alias Was not found, and could not be deleted"
+        exit 7}
+    Set-PFAlias -InputObject $PFserver -PFObject $PFObject
+}
+
+Function DeleteEntry-PFAlias{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$true, HelpMessage='The Alias Name')][string]$Alias,
+        [Parameter(Mandatory=$false, HelpMessage='Detail - not the description')] [string] $Detail
+    )
+    Process{
+        $PFObject = Get-PFAlias -Server $PFserver
+        if($Alias -in $PFObject.name){
+            $Index = 0
+            While($PFObject[$index]){
+                if($PFObject[$index].name -eq $Alias){
+                    $PFObject[$index].Entry = $PFObject[$index].Entry | where {$Detail -ne $_._Detail}
+                }
+                $index++
+            }
+        }
+        else{
+            Write-Error "$Alias Was not found, could not Delete entry $Detail"
+            exit 8
+    }
+        Set-PFAlias -InputObject $PFserver -PFObject $PFObject
+    }
+}
 
 Function Write-PFAlias{
     [CmdletBinding()]
@@ -91,8 +204,6 @@ Function Add-PFDHCPd{
         [Parameter(Mandatory=$false, HelpMessage='The NTPServer used bij the pool')] [string]$NTPServer
     )
     Process{
-        $PFObject = Get-PFdhcpd -Server $PFserver
-
         $Properties = @{
             Gateway = $($InputObject | Get-PFGateway -Name $Gateway)
             Interface = $($InputObject | Get-PFInterface -Description $Interface)
@@ -104,15 +215,7 @@ Function Add-PFDHCPd{
             NTPServer = $NTPServer
         }
         $new = New-Object -TypeName "PFDHCPd" -Property $Properties
-        if($new.Interface.Description -in $PFObject.Interface.Description){
-            $Index = 0
-            While($PFObject[$index]){
-                if($PFObject[$index].Interface.Description -eq $new.Interface.Description){$PFObject[$index] = $new}
-                $index++
-            }
-        }
-        else{$PFObject = $PFObject + $new}
-        ConvertFrom-PFObject -InputObject $PFserver -PFObject $PFObject
+        Set-PFDHCPd -InputObject $PFserver -NewObject $new
     }
 }
 
@@ -123,40 +226,71 @@ Function Write-PFDHCPd{
     }
     process{
         $PFObject = get-pfdhcpd -Server $InputObject
-        $exclude = ("ddnsdomainkeyalgorithm","ddnsdomainprimary","domainsearchlist","filename64","ddnsdomainkey","ddnsdomainkeyname","nextserver","tftp","maxleasetime","ddnsdomain","ldap","failover_peerip","filename","enable","pool","filename32","mac_allow","numberoptions","dhcpleaseinlocaltime","defaultleasetime","ddnsclientupdates","mac_deny","staticmap","rootpath")
+        $exclude = ("ddnsdomainkeyalgorithm","ddnsdomainprimary","domainsearchlist","filename64","ddnsdomainkey","ddnsdomainkeyname","nextserver","tftp","maxleasetime","ddnsdomain","ldap","failover_peerip","filename","enable","pool","filename32","mac_allow","numberoptions","dhcpleaseinlocaltime","defaultleasetime","ddnsclientupdates","mac_deny","staticmap","rootpath","staticmap","StaticHostname","StaticDomain","StaticClientID","StaticMACaddr","StaticIPaddr","StaticDescription","StaticGateway","StaticDNSserver","StaticNTPServer","Staticrootpath","Staticldap","Statictftp","Staticfilename","Staticmaxleasetime","Staticdomainsearchlist","Staticddnsdomainkey","Staticddnsdomainprimary","Staticdefaultleasetime","Staticddnsdomainkeyname","Staticddnsdomain","_StaticHostname","_StaticDomain","_StaticClientID","_StaticMACaddr","_StaticIPaddr","_StaticDescription","_StaticGateway","_StaticDNSserver","_StaticNTPServer","_Staticrootpath","_Staticldap","_Statictftp","_Staticfilename","_Staticmaxleasetime","_Staticdomainsearchlist","_Staticddnsdomainkey","_Staticddnsdomainprimary","_Staticdefaultleasetime","_Staticddnsdomainkeyname","_Staticddnsdomain","staticmaps")
         $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
     }
 }
+
+Function Add-PFDHCPstaticmap{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$True, HelpMessage='The Hostname you want to add')][String]$Hostname,
+        [Parameter(Mandatory=$True, HelpMessage='The Interface Static Map is going to be created on')] [string]$Interface,
+        [Parameter(Mandatory=$false, HelpMessage='The Domain')] [string]$Domain,
+        [Parameter(Mandatory=$True, HelpMessage='The Client ID for this entry, this is mandatory but can be the mac address')] [string]$ClientID,
+        [Parameter(Mandatory=$True, HelpMessage='Mac Address of the new entry')] [string]$MACaddr,
+        [Parameter(Mandatory=$True, HelpMessage='IP Address of the new entry')] [string]$Address,
+        [Parameter(Mandatory=$false, HelpMessage='Description')] [string]$Description,
+        [Parameter(Mandatory=$false, HelpMessage='Gateway, if non is enterd the gateway of the pool is used')] [string]$Gateway,
+        [Parameter(Mandatory=$false, HelpMessage='Gateway, if non is enterd the DNS Server of the pool is used')] [string]$DNSServer,
+        [Parameter(Mandatory=$false, HelpMessage='Gateway, if non is enterd the NTP Server of the pool is used')] [string]$NTPServer
+    )
+    Process{
+        $Properties = @{
+            Interface = $($InputObject | Get-PFInterface -Description $Interface)
+            Hostname = $Hostname
+            Domain = $Domain
+            ClientID = $ClientID
+            MACaddr = $MACaddr
+            IPaddr = $Address
+            Description = $Description
+            Gateway = $(if($Gateway){$InputObject | Get-PFGateway -Name $Gateway})
+            DNSServer = $DNSServer
+            NTPServer = $NTPServer
+        }
+        $new = New-Object -TypeName "PFDHCPstaticmap" -Property $Properties
+        # To Do add to the correct dhcp pool and upload to set-dhcpd
+    }
+}
+
 Function Write-PFDHCPstaticmap{
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
     Begin{
+        $Object = New-Object -TypeName "PFDHCPstaticmap" -Property @{}
         $Collection = New-Object System.Collections.ArrayList
-        $Object = (New-Object -TypeName "PFdhcpStaticMapWrite")
     }
     process{
-        $PFObject = get-PFDHCPStaticMap -Server $InputObject
-        foreach($Staticmap in $PFObject){
-            $indexStaticMap = 0 
-            $Properties = @{}
-            # Here we loop true all the entry's of the array's of the same interface, I use the MACaddr because this is a mandatory entry.
-            while($Staticmap.MACaddr[$indexStaticMap]){
-                $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
-                    $Property = $_.Name
-                    if($Property -eq "interface"){$PropertyValue = $Staticmap.interface}
-                    else{
-                        try {$PropertyValue = $Staticmap.$Property[$indexStaticMap]}
-                        catch{$PropertyValue = $Staticmap.$Property}
+        $PFObject = get-pfdhcpd -Server $InputObject
+        foreach($DHCPStatiMap in $PFObject){
+            $indexDHCPStatiMap = 0
+            try{
+                while($DHCPStatiMap.staticmaps[$indexDHCPStatiMap]){
+                    $Properties = @{Interface = $DHCPStatiMap.Interface}
+                    $Properties = @{}
+                    $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
+                        $Properties.add($_.name,$DHCPStatiMap.staticmaps[$indexDHCPStatiMap].($_.name))
                     }
-                    $Properties.$Property = $PropertyValue
+                    $Properties.Interface = $DHCPStatiMap.Interface
+                    $NewObject = New-Object -TypeName "PFDHCPstaticmap" -Property $Properties
+                    $Collection.add($NewObject)
+                    $indexDHCPStatiMap++
                 }
-                $Object = New-Object -TypeName "PFdhcpStaticMapWrite" -Property $Properties
-                $Collection.Add($Object) | Out-Null
-                $indexStaticMap++
-            } 
-
+            }catch{}
         }
-        $Collection | format-table
+        $exclude = ("rootpath","ldap","tftp","filename","maxleasetime","domainsearchlist","ddnsdomainkey","ddnsdomainprimary","defaultleasetime","ddnsdomainkeyname","ddnsdomain")
+        $Collection | Select-Object -ExcludeProperty $exclude | Format-table *
     }
 }
 
@@ -267,15 +401,13 @@ Function Add-PFStaticRoute{
         [Parameter(Mandatory=$true)][String]$Description
     )
     Process{
-        $PFObject = Get-PFStaticRoute -Server $PFserver
         $Properties = @{
             Network = $Network
             Gateway = $($InputObject | Get-PFGateway -Name $Gateway)
             Description = $Description
         }
         $new = New-Object -TypeName "PFStaticRoute" -Property $Properties
-        $PFObject = $PFObject + $new
-        ConvertFrom-PFObject -InputObject $PFserver -PFObject $PFObject
+        Set-PFStaticRoute -InputObject $PFserver -NewObject $new
     }
 }
 Function Write-PFStaticRoute{
@@ -370,7 +502,7 @@ exit;
 
 Clear-Host
 
-$PFServer = New-Object PFServer -Property @{
+$PFServer = New-Object -TypeName "PFServer" -Property @{
     Address = $Server
     NoTLS = $NoTLS
     SkipCertificateCheck = $SkipCertificateCheck
@@ -412,7 +544,7 @@ try{
     if(-not $Flow.ContainsKey($Service)){  Write-Host "Unknown service '$Service'" -ForegroundColor red; exit 2 }
     if(-not $Flow.$Service.ContainsKey($Action)){ Write-Host "Unknown action '$Action' for service '$Service'" -ForegroundColor red; exit 3 }
 
-    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer,$Network,$Gateway,$Description,$Interface,$From,$To,$netmask,$Domain,$DNSServer,$NTPServer
+    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer,$Network,$Gateway,$Description,$Interface,$From,$To,$netmask,$Domain,$DNSServer,$NTPServer,$Alias,$Type,$Address,$Detail,$HostName,$ClientID,$MacAddr
  
 } catch { 
     Write-Error $_.Exception 

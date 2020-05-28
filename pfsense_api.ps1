@@ -226,14 +226,16 @@ function ConvertFrom-PFObject{
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)][PFServer]$InputObject,
-        [Parameter(Mandatory=$true)]$PFObject
+        [Parameter(Mandatory=$true)]$PFObject,
+        [Parameter(Mandatory=$true)]$PFObjectType
     )
     begin{
-        $PFObjecttype = $PFObject[0].gettype()
+        # Check if PFObject is as expected, thus a array
         $PFType = (New-Object -TypeName $PFObjecttype)
         $PFTypePropertyMapping = $PFType::PropertyMapping
         $PFTypeDelimeterMapping = $PFType::Delimeter
         $PFSection = $PFType::section
+        $ReturnObject = $InputObject.PSConfig
     }
     process{
 #        $PFHashValue = New-Object -TypeName "System.Collections.ArrayList" #It needs to be a array and not a ArrayList
@@ -246,7 +248,7 @@ function ConvertFrom-PFObject{
         }
         if($PFHashValue.gettype() -ne [hashtable]){[array]$PFHashValue = ""} # If $PFHashValue is not a hashtable, it should be a array.
         foreach($PFObjectEntry in $PFObject){
-            $PFHashValueEntry = @{}
+            [Hashtable]$PFHashValueEntry = @{}
             Foreach($Property in $PFObjectEntry.psobject.Properties){
                 [string]$PropertyTypedValue = ""
                 $XMLProperty = $PFTypePropertyMapping.$($Property.name) ? $PFTypePropertyMapping.$($Property.name) : $Property.name.ToLower()
@@ -259,10 +261,11 @@ function ConvertFrom-PFObject{
                 }
                 if($XMLProperty -match "/"){
                     [hashtable]$PropertyTypedValue = @{}
-                    $PropertyTypedValue.add($($XMLProperty.Split("/"))[-1],$PropertyTypedValueConverted) 
-                    [array]$PropertyTypedValueArray = $PropertyTypedValue
-                    if($PFHashValueEntry.$($($XMLProperty.Split("/"))[-2])){$PFHashValueEntry.$($($XMLProperty.Split("/"))[-2]) = $PFHashValueEntry.$($($XMLProperty.Split("/"))[-2]) + $PropertyTypedValueArray}
-                    else{$PFHashValueEntry.add($($XMLProperty.Split("/"))[-2],$PropertyTypedValueArray)}
+                    $PropertyTypedValue.add($($XMLProperty.Split("/"))[-1],$PropertyTypedValueConverted)
+
+#                    [array]$PropertyTypedValueArray = $PropertyTypedValue
+                    if($PFHashValueEntry.$($($XMLProperty.Split("/"))[-2])){$PFHashValueEntry.$($($XMLProperty.Split("/"))[-2]) = $PFHashValueEntry.$($($XMLProperty.Split("/"))[-2]) + $PropertyTypedValue}# $PropertyTypedValueArray}
+                    else{$PFHashValueEntry.add($($XMLProperty.Split("/"))[-2],$PropertyTypedValue)}
                 }
                 else{
                     $PFHashValueEntry.add($XMLProperty,$PropertyTypedValueConverted)
@@ -271,6 +274,7 @@ function ConvertFrom-PFObject{
             }
             if($PFHashValue.gettype() -ne [hashtable]){ # If $PFHashValue is a array add $PFHashValueEntry (In most cases)
                 if([string]::IsNullOrWhitespace($PFHashValue)){$PFHashValue = $PFHashValueEntry} # If the Array is empty (First round), we fill it with the hashtable of $PFHashValueEntry
+                # Using a Array and not a Array list because ConvertTo-XmlRpcType does not take arraylist
                 else{$PFHashValue += $PFHashValueEntry} # If the Array has a value (Second or more), we add the $PFHashValueEntry
             }
             elseif($PFHashValue.gettype() -eq [hashtable]){ # If $PFHashValue is a hashtable, add $PFHashValueEntry as value to the _key as key
@@ -286,14 +290,14 @@ function ConvertFrom-PFObject{
         if($PFSection.Split("/")[1]){
             $PFHashTableName = $($PFSection.Split("/")[-1])
             $PFXMLSection = $($PFSection.Split("/")[-2])
-            $InputObject.PSConfig.$PFXMLSection = @{$PFHashTableName = $PFHashValue}
+            $ReturnObject.$PFXMLSection = @{$PFHashTableName = $PFHashValue}
         }
         else{
-            $InputObject.PSConfig.$PFSection = $PFHashValue
+            $ReturnObject.$PFSection = $PFHashValue
         }
-        [xml]$XMLToUpload = ConvertTo-XmlRpcType -InputObject $InputObject.PSConfig
+        [xml]$XMLToUpload = ConvertTo-XmlRpcType -InputObject $ReturnObject
         $XMLToUpload.Save("NewAll.xml") # Temporary save to easaly open the xml file in a more visual editor, This should be the command to upload to the PFsense 
-       return $test
+       return $XMLToUpload
     }
 }
 
@@ -492,39 +496,114 @@ function Get-PFAlias {
     }
 }
 
+function Set-PFAlias {
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
+        [Parameter(Mandatory=$true)][psobject]$PFObject
+    )
+    Begin{
+        $UploadObjects = New-Object System.Collections.ArrayList 
+    }
+    process{
+        # Split Entry back into alias and detail array's
+        foreach($Object in $PFObject){
+            $index = 0
+            while($Object.Entry[$index]){
+                if($index -eq 0){ # first entry we replace the _address and _detail
+                    $_Address = $Object.Entry[$index]._Address.ToString()
+                    $_Detail = $Object.Entry[$index]._Detail.ToString()
+                }
+                else{   # all the others we add
+                    $_Address += (" {0}" -f $Object.Entry[$index]._Address)
+                    $_Detail += ("||{0}" -f $Object.Entry[$index]._Detail)
+                }
+                $Index++
+            }
+            $UploadObject = [PSCustomObject]@{
+                _Detail = $_Detail
+                _Address = $_Address
+                Name = $Object.name
+                Type = $Object.Type
+                Description = $Object.Description
+            }
+            $UploadObjects.add($UploadObject)    
+        }
+        ConvertFrom-PFObject -InputObject $InputObject -PFObject $UploadObjects -PFObjectType "PFAlias"
+    }    
+}
+
+
+
 
 function Get-PFDHCPd {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
     process {
-        $InputObject | ConvertTo-PFObject -PFObjectType "PFDHCPd"
+        $DHCPD = $InputObject | ConvertTo-PFObject -PFObjectType "PFDHCPd"
+        foreach($Entry in $DHCPD){
+            $Entry.staticmap = @{}
+            $index = 0
+            $Properties = @{}
+            $Object = New-Object -TypeName "PFdhcpStaticMap" -Property $Properties
+            $PFTypePropertyMapping = $Object::PropertyMapping
+            try{
+                while($Entry._StaticMACaddr[$Index]){
+                    $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
+                        $Property = $_.Name
+                        $PropertyMap = ($PFTypePropertyMapping.$Property) ? $PFTypePropertyMapping.$Property : $Property.ToLower()
+                        try {$PropertyValue = $Entry.$PropertyMap[$index]}
+                        catch{$PropertyValue = $Entry.$PropertyMap}
+        
+                        $Properties.$Property = $PropertyValue
+                    }
+                    $Object = New-Object -TypeName "PFdhcpStaticMap" -Property $Properties
+                    $Entry.staticmaps = $Entry.staticmaps + $Object
+                    $index++
+                }
+            }catch{}
+        }
+        return $DHCPD
     }
 }
 
 function Set-PFDHCPd {
     <#
     Make the PFobject ready to send to the ConvertFrom-PFObject.
-    In this case it is already done, but in other cases we need to do some tweaking just like the get-pf functions.
-    to keep the flows the same i still choise to add this function and not send it to the ConfertFrom-PFObject directly.
     #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
         [Parameter(Mandatory=$true)][psobject]$NewObject)
+    Begin{
+        $UploadObjects = New-Object System.Collections.ArrayList 
+    }
     process{
-        ConvertFrom-PFObject -InputObject $InputObject -PFObject $NewObject
+        $PFObject = Get-PFdhcpd -Server $PFserver
+        if($NewObject.Interface.Description -in $PFObject.Interface.Description){
+            $Index = 0
+            While($PFObject[$index]){
+                if($PFObject[$index].Interface.Description -eq $NewObject.Interface.Description){$PFObject[$index] = $NewObject}
+                $index++
+            }
+        }
+        else{$PFObject = $PFObject + $NewObject}
+        foreach($Object in $PFObject){
+            if($Object.staticmaps){
+                $Object.staticmaps | foreach{
+                    $StaticmapHashtable = @{}
+                    $_.psobject.properties.ForEach({$StaticmapHashtable[$_.Name] = $_.Value })
+                    if([string]::IsNullOrWhitespace($Object.staticmap.interface)){$Object.staticmap = $StaticmapHashtable}
+                    else{$Object.staticmap += $StaticmapHashtable}
+                }
+            }
+            $UploadObjects.add($($Object | Select-Object -Property * -ExcludeProperty "staticmaps","_StaticHostname","_StaticDomain","_StaticClientID","_StaticMACaddr","_StaticIPaddr","_StaticDescription","_StaticGateway","_StaticDNSserver","_StaticNTPServer","_Staticrootpath","_Staticldap","_Statictftp","_Staticfilename","_Staticmaxleasetime","_Staticdomainsearchlist","_Staticddnsdomainkey","_Staticddnsdomainprimary","_Staticdefaultleasetime","_Staticddnsdomainkeyname","_Staticddnsdomain"))
+        }
+
+        # DNS Server in staticmap checken
+
+        ConvertFrom-PFObject -InputObject $InputObject -PFObject $UploadObjects -PFObjectType "PFDHCPd"
     }    
 }
-
-
-function Get-PFDHCPStaticMap {
-    [CmdletBinding()]
-    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
-    process {
-        $InputObject | ConvertTo-PFObject -PFObjectType "PFDHCPStaticMap"
-    } 
-}
-
 
 function Get-PFFirewall {
     [CmdletBinding()]
@@ -646,7 +725,16 @@ function Set-PFStaticRoute {
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
         [Parameter(Mandatory=$true)][psobject]$NewObject)
     process{
-        ConvertFrom-PFObject -InputObject $InputObject -PFObject $NewObject
+        $PFObject = Get-PFStaticRoute -Server $PFserver
+        if($NewObject.Network -in $PFObject.Network){
+            $Index = 0
+            While($PFObject[$index]){
+                if($PFObject[$index].Network -eq $NewObject.Network){$PFObject[$index] = $NewObject}
+                $index++
+            }
+        }
+        else{$PFObject = $PFObject + $NewObject}
+        ConvertFrom-PFObject -InputObject $InputObject -PFObject $PFObject -PFObjectType "PFStaticRoute"
     }    
 }
 

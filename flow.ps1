@@ -1,6 +1,10 @@
 $Flow = @{
     "alias" = @{
         "print" = "param(`$InputObject); Write-PFAlias -InputObject `$InputObject"
+        "Add" = "param(`$InputObject,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Entry,`$Type) ; Add-pfalias -InputObject `$InputObject -Alias `$Alias -Type `$Type -address `$Address -detail `$detail -Description `$Description"
+        "Delete" = "param(`$InputObject,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Entry,`$Type) ; Delete-pfalias -InputObject `$InputObject -Alias `$Alias"
+        "AddEntry" = "param(`$InputObject,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Entry,`$Type) ; AddEntry-pfalias -InputObject `$InputObject -Alias `$Alias -address `$Address -detail `$detail"
+        "DeleteEntry" = "param(`$InputObject,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Entry,`$Type) ; DeleteEntry-pfalias -InputObject `$InputObject -Alias `$Alias -detail `$detail"
     }
 
     "dhcpd" = @{
@@ -9,6 +13,7 @@ $Flow = @{
     } 
     "dhcpStaticMap" = @{
         "print" = "param(`$InputObject); Write-PFDHCPstaticmap -InputObject `$InputObject"
+        "Add" = "param(`$InputObject,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr) ; Add-PFDHCPstaticmap -InputObject `$InputObject -Interface `$Interface -Hostname `$Hostname -Domain `$Domain -ClientID `$ClientID -MACaddr `$MACaddr -Address `$Address -Description `$Description -Gateway `$Gateway -DNSserver `$DNSserver -NTPServer `$NTPServer"
     }  
     "dnsResolver" = @{
         "print" = "param(`$InputObject); Write-PFUnbound -InputObject `$InputObject"

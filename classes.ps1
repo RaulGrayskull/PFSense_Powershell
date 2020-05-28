@@ -35,8 +35,7 @@ class PFDHCPd{
     [string]$RangeTo
     [string]$netmask
     [string]$Domain
-#    [PFGateway]$Gateway
-    [string]$Gateway
+    [string]$Gateway # This can be a inividual gateway and does not have to be a pfgateway object
     [string]$DNSServer
     [string]$NTPServer
 #   New Lines
@@ -61,9 +60,32 @@ class PFDHCPd{
     [string]$dhcpleaseinlocaltime           
     [string]$defaultleasetime               
     [string]$ddnsclientupdates              
-    [string]$mac_deny                       
-    [string]$staticmap                                          
-    [string]$rootpath                       
+    [string]$mac_deny
+    [hashtable[]]$staticmap
+    [PFdhcpStaticMap[]]$staticmaps
+#    [string]$staticmap
+    [string]$rootpath
+    # From here they are used for the static map
+    [string[]]$_StaticHostname
+    [string[]]$_StaticDomain
+    [string[]]$_StaticClientID
+    [string[]]$_StaticMACaddr
+    [string[]]$_StaticIPaddr
+    [string[]]$_StaticDescription
+    [string[]]$_StaticGateway
+    [string[]]$_StaticDNSserver
+    [string[]]$_StaticNTPServer
+    [string[]]$_Staticrootpath
+    [string[]]$_Staticldap
+    [string[]]$_Statictftp
+    [string[]]$_Staticfilename
+    [string[]]$_Staticmaxleasetime
+    [string[]]$_Staticdomainsearchlist
+    [string[]]$_Staticddnsdomainkey
+    [string[]]$_Staticddnsdomainprimary
+    [string[]]$_Staticdefaultleasetime
+    [string[]]$_Staticddnsdomainkeyname
+    [string[]]$_Staticddnsdomain                       
 
 
 
@@ -78,78 +100,97 @@ class PFDHCPd{
         Gateway = "Gateway"
         DNSServer = "DNSServer"
         NTPServer = "NTPServer"
+#        staticmap = "Static_map" # This does not excist in the xml, but will be filled by the get function
+        # From here they are used for the static map
+        _StaticHostname = "staticmap/Hostname"
+        _StaticDomain = "staticmap/Domain"
+        _StaticClientID = "staticmap/CID"
+        _StaticIPaddr = "staticmap/IPaddr"
+        _StaticDescription  = "staticmap/descr"
+        _StaticMACaddr  = "staticmap/mac"
+        _StaticGateway = "staticmap/Gateway"
+        _StaticDNSserver = "staticmap/DNSserver"
+        _StaticNTPServer = "staticmap/NTPServer"
+        _Staticrootpath = "staticmap/rootpath"
+        _Staticldap = "staticmap/ldap"
+        _Statictftp = "staticmap/tftp"
+        _Staticfilename = "staticmap/filename"
+        _Staticmaxleasetime = "staticmap/maxleasetime"
+        _Staticdomainsearchlist = "staticmap/domainsearchlist"
+        _Staticddnsdomainkey = "staticmap/ddnsdomainkey"
+        _Staticddnsdomainprimary = "staticmap/ddnsdomainprimary"
+        _Staticdefaultleasetime = "staticmap/defaultleasetime"
+        _Staticddnsdomainkeyname = "staticmap/ddnsdomainkeyname"
+        _Staticddnsdomain = "staticmap/ddnsdomain"
     }
 }
 
 class PFdhcpStaticMap{
-    [PFInterface]$Interface
-    [string[]]$Hostname
-    [string[]]$Domain
-    [string[]]$ClientID
-    [string[]]$MACaddr
-    [string[]]$IPaddr
-    [string[]]$Description
+    [string]$Interface
+    [string]$Hostname
+    [string]$Domain
+    [string]$ClientID
+    [string]$MACaddr
+    [string]$IPaddr
+    [string]$Description
     [string[]]$Gateway
     [string[]]$DNSserver
     [string[]]$NTPServer
-    [string[]]$rootpath
-    [string[]]$ldap
-    [string[]]$tftp
-    [string[]]$filename
-    [string[]]$maxleasetime
-    [string[]]$domainsearchlist
-    [string[]]$ddnsdomainkey
-    [string[]]$ddnsdomainprimary
-    [string[]]$defaultleasetime
-    [string[]]$ddnsdomainkeyname
-    [string[]]$ddnsdomain
-# New lines    
+    [string]$rootpath
+    [string]$ldap
+    [string]$tftp
+    [string]$filename
+    [string]$maxleasetime
+    [string]$domainsearchlist
+    [string]$ddnsdomainkey
+    [string]$ddnsdomainprimary
+    [string]$defaultleasetime
+    [string]$ddnsdomainkeyname
+    [string]$ddnsdomain
 
     static [string]$Section = "dhcpd"
     # property name as it appears in the XML, insofar it's different from the object's property name
     static $PropertyMapping = @{
-        Interface = "_key"
-        Hostname = "staticmap/Hostname"
-        Domain = "staticmap/Domain"
-        ClientID = "staticmap/CID"
-        IPaddr = "staticmap/IPaddr"
-        Description  = "staticmap/descr"
-        MACaddr  = "staticmap/mac"
-        Gateway = "staticmap/Gateway"
-#        DNSserver = "staticmap/DNSserver"
-#        NTPServer = "staticmap/NTPServer"
-# New lines
-        rootpath = "staticmap/rootpath"
-        ldap = "staticmap/ldap"
-        tftp = "staticmap/tftp"
-        filename = "staticmap/filename"
-        maxleasetime = "staticmap/maxleasetime"
-        domainsearchlist = "staticmap/domainsearchlist"
-        ddnsdomainkey = "staticmap/ddnsdomainkey"
-        ddnsdomainprimary = "staticmap/ddnsdomainprimary"
-        defaultleasetime = "staticmap/defaultleasetime"
-        ddnsdomainkeyname = "staticmap/ddnsdomainkeyname"
-        ddnsdomain = "staticmap/ddnsdomain"
+        Hostname = "_StaticHostname"
+        Domain = "_StaticDomain"
+        ClientID = "_StaticClientID"
+        MACaddr = "_StaticMACaddr"
+        IPaddr = "_StaticIPaddr"
+        Description = "_StaticDescription"
+        Gateway = "_StaticGateway"
+        DNSserver = "_StaticDNSserver"
+        NTPServer = "_StaticNTPServer"
+        rootpath  = "_Staticrootpath"
+        ldap = "_Staticldap"
+        tftp = "_Statictftp"
+        filename = "_Staticfilename"
+        maxleasetime = "_Staticmaxleasetime"
+        domainsearchlist = "_Staticdomainsearchlist"
+        ddnsdomainkey = "_Staticddnsdomainkey"
+        ddnsdomainprimary = "_Staticddnsdomainprimary"
+        defaultleasetime = "_Staticdefaultleasetime"
+        ddnsdomainkeyname = "_Staticddnsdomainkeyname"
+        ddnsdomain = "_Staticddnsdomain"
     }
 }
 
 # This class is only used to write the value's to the display, here the value's are in strings and not in a array of strings to improve the estatics
 class PFdhcpStaticMapWrite{
-        [PFInterface]$Interface
-        [string]$Hostname
-        [string]$Domain
-        [string]$ClientID
-        [string]$MACaddr
-        [string]$IPaddr
-        [string]$Description
-        [string]$Gateway
-        [string[]]$DNSserver
-        [string]$NTPServer
-    
-        static [string]$Section = "dhcpd"
-        # property name as it appears in the XML, insofar it's different from the object's property name
-        static $PropertyMapping = @{}
-    }
+    [PFInterface]$Interface
+    [string]$Hostname
+    [string]$Domain
+    [string]$ClientID
+    [string]$MACaddr
+    [string]$IPaddr
+    [string]$Description
+    [string]$Gateway
+    [string[]]$DNSserver
+    [string]$NTPServer
+
+    static [string]$Section = "dhcpd"
+    # property name as it appears in the XML, insofar it's different from the object's property name
+    static $PropertyMapping = @{}
+}
 
 class PFFirewall {
     [bool]$IsFloating = $false

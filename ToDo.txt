@@ -2,10 +2,10 @@ Alias:
 Done
 
 Dhcpd:
-ConfertFrom - staticmap is System.Collections.Hashtable in xml and not the value's
+working on staticmap
 
 DhcpStaticMap:
-Display's dns and ntp of the dhcp-pool, if enabled in class this error: Method invocation failed because [System.Collections.Hashtable] does not contain a method named 'Split'
+if entry has multiple dns servers, the are split over all the entry's.
 
 DnsResolver:
 crashes on pfsense_api line 121 at hosts: Cannot find an overload for "Add" and the argument count: "2"
@@ -15,19 +15,14 @@ crashes (AliasesDescription = "aliases/item/Description" still has a xmlelement)
 It looks to happen if a host has no aliases
 
 Firewall:
-if not valid or no assoiated rule, return $NUll
 
 Gateway:
-Done, if filterd on non excisting return $NULL
 
 Interface:
-Done, if filterd on non excisting return $NULL
 
 Portfwd:
-Done
 
 StaticRoute:
-Done
 
 Vlan's:
 Empty.

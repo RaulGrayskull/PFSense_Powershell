@@ -84,7 +84,8 @@ function ConvertTo-PFObject{
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)][PFServer]$InputObject,
-        [Parameter(Mandatory=$true)]$PFObjectType
+        [Parameter(Mandatory=$true)]$PFObjectType,
+        [Parameter(Mandatory=$False)]$SectionOverride
     )
 
     begin{
@@ -94,6 +95,8 @@ function ConvertTo-PFObject{
         $PFTypeProperties = ($PFType | Get-Member -MemberType properties).Name
         $PFTypePropertyMapping = $PFType::PropertyMapping
         $PFTypeDelimeterMapping = $PFType::Delimeter
+        if($SectionOverride){$PFSection = $SectionOverride}
+        else{$PFSection = $PFType::section}
 
         # container for the resulting PF* objects
         $Collection = New-Object System.Collections.ArrayList        
@@ -105,7 +108,7 @@ function ConvertTo-PFObject{
         $InputObject = $InputObject | Get-PFConfiguration
         
         $ObjectToParse = $InputObject.PSConfig
-        foreach($XMLPFObj in ($PFType::section).Split("/")){
+        foreach($XMLPFObj in $PFSection.Split("/")){
             $ObjectToParse = $ObjectToParse.$XMLPFObj
         }
         if(-not $ObjectToParse){ return }
@@ -195,7 +198,8 @@ function ConvertTo-PFObject{
                         "PFGateway"     { $PropertyTypedValue = $InputObject | Get-PFGateway -Name $PropertyValue } 
                         "PFInterface"   { $PropertyTypedValue = $InputObject | Get-PFInterface -Name $PropertyValue }
                         "PFFirewall"    { if($PropertyValue){$PropertyTypedValue = $InputObject | Get-PFFirewall -associatedruleid $PropertyValue }} # If Propertyvalue is empty, no associated rule is created and it is a empty field, get-pffirewall then try's to return all the rule's and that crashes the script
-                        "bool"          { $PropertyTypedValue = ([bool]$PropertyValue -or ($PropertyValue -in ('yes', 'true', 'checked'))) }
+                        "Enable"        { $PropertyTypedValue = ([bool]$PropertyValue -or ($PropertyValue -in (''))) }
+                        "bool"          { $PropertyTypedValue = ([bool]$PropertyValue -or ($PropertyValue -in ('yes', 'true', 'checked', ''))) }
                         default         { $PropertyTypedValue = $PropertyValue }
                     }
 
@@ -228,6 +232,7 @@ function ConvertFrom-PFObject{
         [Parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)][PFServer]$InputObject,
         [Parameter(Mandatory=$true)]$PFObject,
         [Parameter(Mandatory=$true)]$PFObjectType
+        
     )
     begin{
         # Check if PFObject is as expected, thus a array
@@ -541,26 +546,9 @@ function Get-PFDHCPd {
     process {
         $DHCPD = $InputObject | ConvertTo-PFObject -PFObjectType "PFDHCPd"
         foreach($Entry in $DHCPD){
-            $Entry.staticmap = @{}
-            $index = 0
-            $Properties = @{}
-            $Object = New-Object -TypeName "PFdhcpStaticMap" -Property $Properties
-            $PFTypePropertyMapping = $Object::PropertyMapping
-            try{
-                while($Entry._StaticMACaddr[$Index]){
-                    $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
-                        $Property = $_.Name
-                        $PropertyMap = ($PFTypePropertyMapping.$Property) ? $PFTypePropertyMapping.$Property : $Property.ToLower()
-                        try {$PropertyValue = $Entry.$PropertyMap[$index]}
-                        catch{$PropertyValue = $Entry.$PropertyMap}
-        
-                        $Properties.$Property = $PropertyValue
-                    }
-                    $Object = New-Object -TypeName "PFdhcpStaticMap" -Property $Properties
-                    $Entry.staticmaps = $Entry.staticmaps + $Object
-                    $index++
-                }
-            }catch{}
+            $SectionOverride = "dhcpd/{0}/staticmap" -f $Entry.Interface.name
+            $DHCPStaticmap = $InputObject | ConvertTo-PFObject -PFObjectType "PFdhcpStaticMap" -SectionOverride $SectionOverride
+            $Entry.staticmaps = $DHCPStaticmap
         }
         return $DHCPD
     }
@@ -589,18 +577,16 @@ function Set-PFDHCPd {
         else{$PFObject = $PFObject + $NewObject}
         foreach($Object in $PFObject){
             if($Object.staticmaps){
+                $Object.staticmap = @{}
                 $Object.staticmaps | foreach{
                     $StaticmapHashtable = @{}
                     $_.psobject.properties.ForEach({$StaticmapHashtable[$_.Name] = $_.Value })
-                    if([string]::IsNullOrWhitespace($Object.staticmap.interface)){$Object.staticmap = $StaticmapHashtable}
+                    if([string]::IsNullOrWhitespace($Object.staticmap.Macaddr)){$Object.staticmap = $StaticmapHashtable}
                     else{$Object.staticmap += $StaticmapHashtable}
                 }
             }
-            $UploadObjects.add($($Object | Select-Object -Property * -ExcludeProperty "staticmaps","_StaticHostname","_StaticDomain","_StaticClientID","_StaticMACaddr","_StaticIPaddr","_StaticDescription","_StaticGateway","_StaticDNSserver","_StaticNTPServer","_Staticrootpath","_Staticldap","_Statictftp","_Staticfilename","_Staticmaxleasetime","_Staticdomainsearchlist","_Staticddnsdomainkey","_Staticddnsdomainprimary","_Staticdefaultleasetime","_Staticddnsdomainkeyname","_Staticddnsdomain"))
+            $UploadObjects.add($($Object | Select-Object -Property * -ExcludeProperty "staticmaps"))
         }
-
-        # DNS Server in staticmap checken
-
         ConvertFrom-PFObject -InputObject $InputObject -PFObject $UploadObjects -PFObjectType "PFDHCPd"
     }    
 }

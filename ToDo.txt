@@ -2,10 +2,11 @@ Alias:
 Done
 
 Dhcpd:
-working on staticmap
+Enable / disable DHCP Interface
+Make Delete dhcpd settings
 
 DhcpStaticMap:
-if entry has multiple dns servers, the are split over all the entry's.
+Make Delete Entry
 
 DnsResolver:
 crashes on pfsense_api line 121 at hosts: Cannot find an overload for "Add" and the argument count: "2"
@@ -23,6 +24,7 @@ Interface:
 Portfwd:
 
 StaticRoute:
+
 
 Vlan's:
 Empty.

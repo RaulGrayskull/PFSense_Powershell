@@ -10,10 +10,13 @@ $Flow = @{
     "dhcpd" = @{
         "print" = "param(`$InputObject); Write-PFDHCPd -InputObject `$InputObject"
         "Add" = "param(`$InputObject,`$Network,`$Gateway,`$Description) ; Add-PFDHCPd -InputObject `$InputObject -Interface `$Interface -From `$From -To `$To -netmask `$netmask -Domain `$Domain -Gateway `$Gateway -DNSServer `$DNSServer -NTPServer `$NTPServer "
+        "Set" = "param(`$InputObject,`$Network,`$Gateway,`$Description) ; Add-PFDHCPd -InputObject `$InputObject -Interface `$Interface -From `$From -To `$To -netmask `$netmask -Domain `$Domain -Gateway `$Gateway -DNSServer `$DNSServer -NTPServer `$NTPServer "
+
     } 
     "dhcpStaticMap" = @{
         "print" = "param(`$InputObject); Write-PFDHCPstaticmap -InputObject `$InputObject"
         "Add" = "param(`$InputObject,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr) ; Add-PFDHCPstaticmap -InputObject `$InputObject -Interface `$Interface -Hostname `$Hostname -Domain `$Domain -ClientID `$ClientID -MACaddr `$MACaddr -Address `$Address -Description `$Description -Gateway `$Gateway -DNSserver `$DNSserver -NTPServer `$NTPServer"
+        "Delete" = "param(`$InputObject,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr) ; Delete-PFDHCPstaticmap -InputObject `$InputObject -Interface `$Interface -Hostname `$Hostname -Domain `$Domain -ClientID `$ClientID -MACaddr `$MACaddr -Address `$Address -Description `$Description -Gateway `$Gateway -DNSserver `$DNSserver -NTPServer `$NTPServer"
     }  
     "dnsResolver" = @{
         "print" = "param(`$InputObject); Write-PFUnbound -InputObject `$InputObject"

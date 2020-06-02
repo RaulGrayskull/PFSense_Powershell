@@ -205,7 +205,7 @@ Function Add-PFDHCPd{
     )
     Process{
         $Properties = @{
-            Gateway = $($InputObject | Get-PFGateway -Name $Gateway)
+            Gateway = $Gateway
             Interface = $($InputObject | Get-PFInterface -Description $Interface)
             RangeFrom = $From
             RangeTo = $To
@@ -215,6 +215,15 @@ Function Add-PFDHCPd{
             NTPServer = $NTPServer
         }
         $new = New-Object -TypeName "PFDHCPd" -Property $Properties
+        $PFObject = get-pfdhcpd -Server $InputObject
+        # ToDo: Get the staticmap and reuse those if the dhcp setting already excists
+        if($new.interface.Description -in $PFObject.interface.Description){
+            $PFObject | ForEach-Object{
+                if($new.Interface.Description -eq $_.Interface.Description){
+                    $new.staticmaps = $_.staticmaps
+                }
+            }
+        }
         Set-PFDHCPd -InputObject $PFserver -NewObject $new
     }
 }
@@ -226,7 +235,7 @@ Function Write-PFDHCPd{
     }
     process{
         $PFObject = get-pfdhcpd -Server $InputObject
-        $exclude = ("ddnsdomainkeyalgorithm","ddnsdomainprimary","domainsearchlist","filename64","ddnsdomainkey","ddnsdomainkeyname","nextserver","tftp","maxleasetime","ddnsdomain","ldap","failover_peerip","filename","enable","pool","filename32","mac_allow","numberoptions","dhcpleaseinlocaltime","defaultleasetime","ddnsclientupdates","mac_deny","staticmap","rootpath","staticmap","StaticHostname","StaticDomain","StaticClientID","StaticMACaddr","StaticIPaddr","StaticDescription","StaticGateway","StaticDNSserver","StaticNTPServer","Staticrootpath","Staticldap","Statictftp","Staticfilename","Staticmaxleasetime","Staticdomainsearchlist","Staticddnsdomainkey","Staticddnsdomainprimary","Staticdefaultleasetime","Staticddnsdomainkeyname","Staticddnsdomain","_StaticHostname","_StaticDomain","_StaticClientID","_StaticMACaddr","_StaticIPaddr","_StaticDescription","_StaticGateway","_StaticDNSserver","_StaticNTPServer","_Staticrootpath","_Staticldap","_Statictftp","_Staticfilename","_Staticmaxleasetime","_Staticdomainsearchlist","_Staticddnsdomainkey","_Staticddnsdomainprimary","_Staticdefaultleasetime","_Staticddnsdomainkeyname","_Staticddnsdomain","staticmaps")
+        $exclude = ("ddnsdomainkeyalgorithm","ddnsdomainprimary","domainsearchlist","filename64","ddnsdomainkey","ddnsdomainkeyname","nextserver","tftp","maxleasetime","ddnsdomain","ldap","failover_peerip","filename","pool","filename32","mac_allow","numberoptions","dhcpleaseinlocaltime","defaultleasetime","ddnsclientupdates","mac_deny","staticmap","rootpath","staticmap","StaticHostname","StaticDomain","StaticClientID","StaticMACaddr","StaticIPaddr","StaticDescription","StaticGateway","StaticDNSserver","StaticNTPServer","Staticrootpath","Staticldap","Statictftp","Staticfilename","Staticmaxleasetime","Staticdomainsearchlist","Staticddnsdomainkey","Staticddnsdomainprimary","Staticdefaultleasetime","Staticddnsdomainkeyname","Staticddnsdomain","_StaticHostname","_StaticDomain","_StaticClientID","_StaticMACaddr","_StaticIPaddr","_StaticDescription","_StaticGateway","_StaticDNSserver","_StaticNTPServer","_Staticrootpath","_Staticldap","_Statictftp","_Staticfilename","_Staticmaxleasetime","_Staticdomainsearchlist","_Staticddnsdomainkey","_Staticddnsdomainprimary","_Staticdefaultleasetime","_Staticddnsdomainkeyname","_Staticddnsdomain","staticmaps")
         $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
     }
 }
@@ -255,12 +264,39 @@ Function Add-PFDHCPstaticmap{
             MACaddr = $MACaddr
             IPaddr = $Address
             Description = $Description
-            Gateway = $(if($Gateway){$InputObject | Get-PFGateway -Name $Gateway})
+            Gateway = $Gateway # This does not have to be a known gateway on the pfsense, no need for: $(if($Gateway){$InputObject | Get-PFGateway -Name $Gateway})
             DNSServer = $DNSServer
             NTPServer = $NTPServer
         }
         $new = New-Object -TypeName "PFDHCPstaticmap" -Property $Properties
-        # To Do add to the correct dhcp pool and upload to set-dhcpd
+        # ToDo: add to the correct dhcp pool and upload to set-dhcpd
+        $PFObject = get-pfdhcpd -Server $InputObject
+        if($new.Interface.Description -in $PFObject.interface.Description){
+            foreach($DHCPObject in $PFObject){
+                if($DHCPObject.Interface.Description -eq $new.Interface.Description){
+                    $DHCPObject.staticmaps += $New
+                    Set-PFDHCPd -InputObject $PFserver -NewObject $DHCPObject
+                }
+            }
+        }
+        else{
+            "Could not find Interface {0}" -f $new.interface
+        }
+
+
+        
+    }
+}
+
+Function Delete-PFDHCPstaticmap{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$True, HelpMessage='The Interface Static Map is going to be created on')] [string]$Interface,
+        [Parameter(Mandatory=$True, HelpMessage='Mac Address of the new entry')] [string]$MACaddr
+    )
+    Process{
+
     }
 }
 
@@ -277,7 +313,6 @@ Function Write-PFDHCPstaticmap{
             $indexDHCPStatiMap = 0
             try{
                 while($DHCPStatiMap.staticmaps[$indexDHCPStatiMap]){
-                    $Properties = @{Interface = $DHCPStatiMap.Interface}
                     $Properties = @{}
                     $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
                         $Properties.add($_.name,$DHCPStatiMap.staticmaps[$indexDHCPStatiMap].($_.name))

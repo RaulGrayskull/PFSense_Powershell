@@ -29,11 +29,12 @@ class PFAliasEntry {
 }
 
 class Enable{
-    [bool]$Enable
+    $Enable = $false
 }
 
 class PFDHCPd{
-    [Enable]$enable
+#    [Enable]$enable
+    [Bool]$enable
     [PFInterface]$Interface
     [string]$RangeFrom
     [string]$RangeTo

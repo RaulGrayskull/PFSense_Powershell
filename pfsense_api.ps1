@@ -198,7 +198,7 @@ function ConvertTo-PFObject{
                         "PFGateway"     { $PropertyTypedValue = $InputObject | Get-PFGateway -Name $PropertyValue } 
                         "PFInterface"   { $PropertyTypedValue = $InputObject | Get-PFInterface -Name $PropertyValue }
                         "PFFirewall"    { if($PropertyValue){$PropertyTypedValue = $InputObject | Get-PFFirewall -associatedruleid $PropertyValue }} # If Propertyvalue is empty, no associated rule is created and it is a empty field, get-pffirewall then try's to return all the rule's and that crashes the script
-                        "Enable"        { $PropertyTypedValue = ([bool]$PropertyValue -or ($PropertyValue -in (''))) }
+                        "Enable"        { $PropertyTypedValue = $(if($PropertyValue -eq ""){$True} else{$False} )}
                         "bool"          { $PropertyTypedValue = ([bool]$PropertyValue -or ($PropertyValue -in ('yes', 'true', 'checked', ''))) }
                         default         { $PropertyTypedValue = $PropertyValue }
                     }

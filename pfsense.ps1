@@ -5,6 +5,8 @@ Param
     [Parameter(Mandatory=$false, HelpMessage='The Password')] [string] $InsecurePassword,
     [Parameter(Mandatory=$false, HelpMessage='The service you would like to talke to')] [string] $Service,
     [Parameter(Mandatory=$false, HelpMessage='The action you would like to do on the service')] [string] $Action,
+    [Parameter(Mandatory=$false, HelpMessage='The Path where the xml file is to be stored, restored from')] [string] $Path,
+    [Parameter(Mandatory=$false, HelpMessage='The File name of the xml file')] [string] $File,
     [Parameter(Mandatory=$false, HelpMessage='The Network value')] [string] $Network,
     [Parameter(Mandatory=$false, HelpMessage='The Gateway name')] [string] $Gateway,
     [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Description,
@@ -235,7 +237,7 @@ Function Write-PFDHCPd{
     }
     process{
         $PFObject = get-pfdhcpd -Server $InputObject
-        $exclude = ("ddnsdomainkeyalgorithm","ddnsdomainprimary","domainsearchlist","filename64","ddnsdomainkey","ddnsdomainkeyname","nextserver","tftp","maxleasetime","ddnsdomain","ldap","failover_peerip","filename","pool","filename32","mac_allow","numberoptions","dhcpleaseinlocaltime","defaultleasetime","ddnsclientupdates","mac_deny","staticmap","rootpath","staticmap","StaticHostname","StaticDomain","StaticClientID","StaticMACaddr","StaticIPaddr","StaticDescription","StaticGateway","StaticDNSserver","StaticNTPServer","Staticrootpath","Staticldap","Statictftp","Staticfilename","Staticmaxleasetime","Staticdomainsearchlist","Staticddnsdomainkey","Staticddnsdomainprimary","Staticdefaultleasetime","Staticddnsdomainkeyname","Staticddnsdomain","_StaticHostname","_StaticDomain","_StaticClientID","_StaticMACaddr","_StaticIPaddr","_StaticDescription","_StaticGateway","_StaticDNSserver","_StaticNTPServer","_Staticrootpath","_Staticldap","_Statictftp","_Staticfilename","_Staticmaxleasetime","_Staticdomainsearchlist","_Staticddnsdomainkey","_Staticddnsdomainprimary","_Staticdefaultleasetime","_Staticddnsdomainkeyname","_Staticddnsdomain","staticmaps")
+        $exclude = ("ddnsdomainkeyalgorithm","ddnsdomainprimary","domainsearchlist","filename64","ddnsdomainkey","ddnsdomainkeyname","nextserver","tftp","maxleasetime","ddnsdomain","ldap","failover_peerip","filename","pool","filename32","mac_allow","numberoptions","dhcpleaseinlocaltime","defaultleasetime","ddnsclientupdates","mac_deny","_staticmaps","rootpath","staticmap","StaticHostname","StaticDomain","StaticClientID","StaticMACaddr","StaticIPaddr","StaticDescription","StaticGateway","StaticDNSserver","StaticNTPServer","Staticrootpath","Staticldap","Statictftp","Staticfilename","Staticmaxleasetime","Staticdomainsearchlist","Staticddnsdomainkey","Staticddnsdomainprimary","Staticdefaultleasetime","Staticddnsdomainkeyname","Staticddnsdomain","_StaticHostname","_StaticDomain","_StaticClientID","_StaticMACaddr","_StaticIPaddr","_StaticDescription","_StaticGateway","_StaticDNSserver","_StaticNTPServer","_Staticrootpath","_Staticldap","_Statictftp","_Staticfilename","_Staticmaxleasetime","_Staticdomainsearchlist","_Staticddnsdomainkey","_Staticddnsdomainprimary","_Staticdefaultleasetime","_Staticddnsdomainkeyname","_Staticddnsdomain","staticmaps")
         $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
     }
 }
@@ -579,7 +581,7 @@ try{
     if(-not $Flow.ContainsKey($Service)){  Write-Host "Unknown service '$Service'" -ForegroundColor red; exit 2 }
     if(-not $Flow.$Service.ContainsKey($Action)){ Write-Host "Unknown action '$Action' for service '$Service'" -ForegroundColor red; exit 3 }
 
-    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer,$Network,$Gateway,$Description,$Interface,$From,$To,$netmask,$Domain,$DNSServer,$NTPServer,$Alias,$Type,$Address,$Detail,$HostName,$ClientID,$MacAddr
+    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer,$path,$file,$Network,$Gateway,$Description,$Interface,$From,$To,$netmask,$Domain,$DNSServer,$NTPServer,$Alias,$Type,$Address,$Detail,$HostName,$ClientID,$MacAddr
  
 } catch { 
     Write-Error $_.Exception 

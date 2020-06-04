@@ -1,4 +1,10 @@
 $Flow = @{
+    "All" = @{
+        "Save" = "param(`$InputObject, `$path, `$file); Save-PFAll -InputObject `$InputObject -path `$path -File `$file"
+        "Restore" = "param(`$InputObject, `$path, `$file); Restore-PFAll -InputObject `$InputObject -path `$path -File `$file"
+    }
+
+
     "alias" = @{
         "print" = "param(`$InputObject); Write-PFAlias -InputObject `$InputObject"
         "Add" = "param(`$InputObject,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Entry,`$Type) ; Add-pfalias -InputObject `$InputObject -Alias `$Alias -Type `$Type -address `$Address -detail `$detail -Description `$Description"

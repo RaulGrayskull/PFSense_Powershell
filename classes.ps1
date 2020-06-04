@@ -28,12 +28,7 @@ class PFAliasEntry {
     }
 }
 
-class Enable{
-    $Enable = $false
-}
-
 class PFDHCPd{
-#    [Enable]$enable
     [Bool]$enable
     [PFInterface]$Interface
     [string]$RangeFrom
@@ -65,9 +60,8 @@ class PFDHCPd{
     [string]$defaultleasetime               
     [string]$ddnsclientupdates              
     [string]$mac_deny
-    [hashtable[]]$staticmap
+    [hashtable[]]$_staticmaps
     [PFdhcpStaticMap[]]$staticmaps
-#    [string]$staticmap
     [string]$rootpath             
 
     static [string]$Section = "dhcpd"
@@ -81,6 +75,7 @@ class PFDHCPd{
         Gateway = "Gateway"
         DNSServer = "DNSServer"
         NTPServer = "NTPServer"
+        _staticmaps = "staticmap"
     }
 }
 

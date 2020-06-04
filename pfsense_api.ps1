@@ -69,14 +69,7 @@ Param
     [switch] $SkipCertificateCheck
     )
 
-# Test to see if the xmlrpc is installed, if not install
-# TODO: make this a bit nicer, with error handling and stuff
-if (Get-Module -ListAvailable -Name XmlRpc) {
-    Write-Host "Module exists"
-}  
-else {
-    Install-Module -Name XmlRpc
-}
+
 #>
 # dotsource the classes
 . .\classes.ps1
@@ -198,7 +191,6 @@ function ConvertTo-PFObject{
                         "PFGateway"     { $PropertyTypedValue = $InputObject | Get-PFGateway -Name $PropertyValue } 
                         "PFInterface"   { $PropertyTypedValue = $InputObject | Get-PFInterface -Name $PropertyValue }
                         "PFFirewall"    { if($PropertyValue){$PropertyTypedValue = $InputObject | Get-PFFirewall -associatedruleid $PropertyValue }} # If Propertyvalue is empty, no associated rule is created and it is a empty field, get-pffirewall then try's to return all the rule's and that crashes the script
-                        "Enable"        { $PropertyTypedValue = $(if($PropertyValue -eq ""){$True} else{$False} )}
                         "bool"          { $PropertyTypedValue = ([bool]$PropertyValue -or ($PropertyValue -in ('yes', 'true', 'checked', ''))) }
                         default         { $PropertyTypedValue = $PropertyValue }
                     }
@@ -261,7 +253,6 @@ function ConvertFrom-PFObject{
                     "PFGateway"     { $PropertyTypedValueConverted = $Property.value.name } 
                     "PFInterface"   { $PropertyTypedValueConverted = $Property.value.Description}
 #                    "PFFirewall"    {}
-#                    "bool"          {}
                     default         { $PropertyTypedValueConverted = $Property.value}
                 }
                 if($XMLProperty -match "/"){
@@ -300,9 +291,33 @@ function ConvertFrom-PFObject{
         else{
             $ReturnObject.$PFSection = $PFHashValue
         }
+        # Take out the _key value's
+        
+        Remove__Key -Hashtable $ReturnObject
+
         [xml]$XMLToUpload = ConvertTo-XmlRpcType -InputObject $ReturnObject
         $XMLToUpload.Save("NewAll.xml") # Temporary save to easaly open the xml file in a more visual editor, This should be the command to upload to the PFsense 
        return $XMLToUpload
+    }
+}
+
+Function Remove__Key{
+    <#
+    This function remove's the _key value's from the return object
+    #>
+    param([Parameter(ValueFromPipeline = $true)][hashtable]$Hashtable)
+    process{
+        foreach($Key in $Hashtable.keys){
+            try{ # it can happen that $hashtable.Item($key) is a $Null value, this creates a error on the gettype(), we catch those and can continue with the code. this is not a hashtable
+                if($hashtable.Item($Key).gettype() -eq [hashtable]){
+                    Remove__Key -Hashtable $hashtable.Item($Key) # if it is a hashtable in a hashtable, we go tru that hashtable as well
+                }
+            }catch{}
+            if("_key" -eq $Key){ # if the $key is _key, we use that internally in the script, there have to be removed from the hashtables
+                $Hashtable.Remove($Key)
+                return
+            }
+        }
     }
 }
 
@@ -394,6 +409,41 @@ function Get-PFConfiguration {
 
         return $InputObject
     }    
+}
+
+Function Save-PFAll{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$false, HelpMessage='The Path where the xml file is to be stored')] [string] $Path,
+        [Parameter(Mandatory=$false, HelpMessage='The File name of the xml file')] [string] $File
+        )
+    Process{
+        # check if the file enterd has a .xml extention, if not, add it.
+        if(-not $file.EndsWith(".xmlrpc")){$file = "{0}.xmlrpc" -f $File}
+        if(!(Test-Path $Path)){
+            New-Item -ItemType Directory -Force -Path $Path
+        }
+        $InputObject.XMLConfig.Save("$path\$file")
+    }
+}
+
+Function Restore-PFAll{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$false, HelpMessage='The Path where the xml file is to be stored')] [string] $Path,
+        [Parameter(Mandatory=$false, HelpMessage='The File name of the xml file')] [string] $File
+        )
+    Process{
+        # check if the file enterd has a .xml extention, if not, add it.
+        if(-not $file.EndsWith(".xmlrpc")){$file = "{0}.xmlrpc" -f $File}
+        if(!(Test-Path $Path)){
+            Write-Error "Could not find path"
+        }
+        [xml]$RestoreXML = Get-Content "$path\$file"
+        $InputObject.XMLConfig = $RestoreXML
+    }
 }
 
 function Get-PFInterface {
@@ -577,12 +627,19 @@ function Set-PFDHCPd {
         else{$PFObject = $PFObject + $NewObject}
         foreach($Object in $PFObject){
             if($Object.staticmaps){
-                $Object.staticmap = @{}
+                $Object._staticmaps = @{}
                 $Object.staticmaps | foreach{
                     $StaticmapHashtable = @{}
-                    $_.psobject.properties.ForEach({$StaticmapHashtable[$_.Name] = $_.Value })
-                    if([string]::IsNullOrWhitespace($Object.staticmap.Macaddr)){$Object.staticmap = $StaticmapHashtable}
-                    else{$Object.staticmap += $StaticmapHashtable}
+                    $_.psobject.properties | foreach{
+                        if($_.name -eq "Interface"){ # The Interface is a internal object and does not need to be uploaded
+                            return
+                        }
+                        else{
+                            $StaticmapHashtable[$_.Name] = $_.Value
+                        }
+                    }
+                    if([string]::IsNullOrWhitespace($Object.staticmap.Macaddr)){$Object._staticmaps = $StaticmapHashtable}
+                    else{$Object._staticmaps += $StaticmapHashtable}
                 }
             }
             $UploadObjects.add($($Object | Select-Object -Property * -ExcludeProperty "staticmaps"))

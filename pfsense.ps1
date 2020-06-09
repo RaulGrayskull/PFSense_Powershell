@@ -24,6 +24,13 @@ Param
     [Parameter(Mandatory=$false, HelpMessage='Hostname')] [string] $HostName,
     [Parameter(Mandatory=$false, HelpMessage='Client ID')] [string] $ClientID,
     [Parameter(Mandatory=$false, HelpMessage='Mac Address')] [string] $MacAddr,
+    [Parameter(Mandatory=$false, HelpMessage='Network protocol like: TCP, UDP, ICMP')] [string] $Protocol,
+    [Parameter(Mandatory=$false, HelpMessage='Source Address')] [string] $SourceAddress,
+    [Parameter(Mandatory=$false, HelpMessage='Source Port')] [string] $SourcePort,
+    [Parameter(Mandatory=$false, HelpMessage='Destination Address')] [string] $DestAddress,
+    [Parameter(Mandatory=$false, HelpMessage='Destination Port')] [string] $DestPort,
+    [Parameter(Mandatory=$false, HelpMessage='The Local Ip Address')] [string] $NatIp,
+    [Parameter(Mandatory=$false, HelpMessage='The Local Port')] [string] $NatPort,
     [Switch] $NoTLS,
     [switch] $SkipCertificateCheck
     )
@@ -229,7 +236,28 @@ Function Add-PFDHCPd{
         Set-PFDHCPd -InputObject $PFserver -NewObject $new
     }
 }
-
+Function EnableOrDisable-PFDHCPd{
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+            [Parameter(Mandatory=$true, HelpMessage='The Interface the DHCPd listen on')] [string]$Interface,
+            [Parameter(Mandatory=$true, HelpMessage='The Interface the DHCPd listen on')] [bool]$EnableOrDisable
+            )
+    Begin{
+        $InterfaceObject = $($InputObject | Get-PFInterface -Description $Interface)
+    }
+    process{
+        $PFObject = get-pfdhcpd -Server $InputObject
+        if($InterfaceObject.description -in $PFObject.interface.description){
+            $PFObject | ForEach-Object{
+                if($InterfaceObject.Description -eq $_.Interface.Description){
+                    $new = $_
+                }
+            }        
+        }
+        $new.enable = $EnableOrDisable
+        Set-PFDHCPd -InputObject $PFserver -NewObject $new
+    }
+}
 Function Write-PFDHCPd{
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
@@ -271,22 +299,29 @@ Function Add-PFDHCPstaticmap{
             NTPServer = $NTPServer
         }
         $new = New-Object -TypeName "PFDHCPstaticmap" -Property $Properties
-        # ToDo: add to the correct dhcp pool and upload to set-dhcpd
         $PFObject = get-pfdhcpd -Server $InputObject
         if($new.Interface.Description -in $PFObject.interface.Description){
             foreach($DHCPObject in $PFObject){
                 if($DHCPObject.Interface.Description -eq $new.Interface.Description){
-                    $DHCPObject.staticmaps += $New
+                    if($New.MACaddr -in $DHCPObject.staticmaps.MACaddr){ # If the Mac address allready excists, update the entry
+                        $DHCPObject.staticmaps | foreach {
+                            if($New.MACaddr -eq $_.MACaddr){
+                                $_.PSObject.Properties.ForEach({
+                                    $_.Value = $new.($_.name)
+                                })
+                            }
+                        }
+                    }
+                    else{
+                    $DHCPObject.staticmaps += $New # If it is a new staticmap, add the staticmap to staticmaps
+                    }
                     Set-PFDHCPd -InputObject $PFserver -NewObject $DHCPObject
                 }
             }
         }
         else{
             "Could not find Interface {0}" -f $new.interface
-        }
-
-
-        
+        }     
     }
 }
 
@@ -294,11 +329,21 @@ Function Delete-PFDHCPstaticmap{
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
-        [Parameter(Mandatory=$True, HelpMessage='The Interface Static Map is going to be created on')] [string]$Interface,
-        [Parameter(Mandatory=$True, HelpMessage='Mac Address of the new entry')] [string]$MACaddr
+        [Parameter(Mandatory=$True, HelpMessage='The Interface Static Map is going to be deleted on')] [string]$Interface,
+        [Parameter(Mandatory=$True, HelpMessage='Mac Address of the entry you would like to delete')] [string]$MACaddr
     )
     Process{
-
+        $PFObject = get-pfdhcpd -Server $InputObject
+        $InterfaceObject = $($InputObject | Get-PFInterface -Description $Interface)
+        if($InterfaceObject.Description -in $PFObject.interface.Description){
+            foreach($DHCPObject in $PFObject){
+                if($DHCPObject.Interface.Description -eq $InterfaceObject.Description){
+                    $DHCPObject.staticmaps = $DHCPObject.staticmaps | Where-Object { $_.MacAddr -ne $MacAddr }
+                    Set-PFDHCPd -InputObject $InputObject -NewObject $DHCPObject
+                    return
+                }
+            }
+        }
     }
 }
 
@@ -415,6 +460,47 @@ Function Write-PFInterface{
     }
 }
 
+Function Add-PFNatRule{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$True, HelpMessage='The Interface the port forward is going to be created on')] [string]$Interface,
+        [Parameter(Mandatory=$false, HelpMessage='Network protocol like: TCP, UDP, ICMP')] [string] $Protocol,
+        [Parameter(Mandatory=$false, HelpMessage='Source Address')] [string] $SourceAddress,
+        [Parameter(Mandatory=$false, HelpMessage='Source Port')] [string] $SourcePort,
+        [Parameter(Mandatory=$false, HelpMessage='Destination Address')] [string] $DestAddress,
+        [Parameter(Mandatory=$false, HelpMessage='Destination Port')] [string] $DestPort,
+        [Parameter(Mandatory=$false, HelpMessage='The Local Ip Address')] [string] $NatIp,
+        [Parameter(Mandatory=$false, HelpMessage='The Local Port')] [string] $NatPort,
+        [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Description
+        )
+    Begin{
+        $Updated = @{
+            Username = $Username
+            time = [string][Math]::Floor((New-TimeSpan -Start $(Get-Date -Date "01/01/1970") -End $(get-date)).TotalSeconds)
+        }
+    }
+    process{
+        $Properties = @{
+            Interface = $($InputObject | Get-PFInterface -Description $Interface)
+            Protocol = $Protocol
+            SourceAddress = $SourceAddress
+            SourcePort = $SourcePort
+            DestinationAddress = $DestAddress
+            DestinationPort = $DestPort
+            target = $NatIp
+            LocalPort = $NatPort
+            Description = $Description
+            Updated = $Updated
+            created = $Updated
+        }
+    $new = New-Object -TypeName "PFNATRule" -Property $Properties
+    $PFObject = get-PFNATRule -Server $InputObject
+    $PFObject += $new
+    Set-PFNatRule -InputObject $InputObject -NewObject $PFObject
+    }
+}
+
 Function Write-PFNatRule{
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
@@ -437,16 +523,50 @@ Function Add-PFStaticRoute{
         [Parameter(Mandatory=$true)][String]$Gateway,
         [Parameter(Mandatory=$true)][String]$Description
     )
+    begin{
+        $PFObject = Get-PFStaticRoute -Server $InputObject
+    }
     Process{
         $Properties = @{
             Network = $Network
             Gateway = $($InputObject | Get-PFGateway -Name $Gateway)
             Description = $Description
         }
-        $new = New-Object -TypeName "PFStaticRoute" -Property $Properties
-        Set-PFStaticRoute -InputObject $PFserver -NewObject $new
+        $NewObject = New-Object -TypeName "PFStaticRoute" -Property $Properties
+        if($NewObject.Network -in $PFObject.Network){
+            $Index = 0
+            While($PFObject[$index]){
+                if($PFObject[$index].Network -eq $NewObject.Network){$PFObject[$index] = $NewObject}
+                $index++
+            }
+        }
+        else{$PFObject = $PFObject + $NewObject}
+
+        Set-PFStaticRoute -InputObject $InputObject -NewObject $PFObject
     }
 }
+
+Function Delete-PFStaticRoute{
+    <#
+    Create a new PFStaticRoute object with the value's you would like to add
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$true)][String]$Network)
+    begin{
+        $PFObject = Get-PFStaticRoute -Server $InputObject
+    }
+    process{
+        if($Network -in $PFObject.Network){
+            $PFObject = $PFObject | Where-Object {$Network -ne $_.Network}
+        }
+        else{Write-Error "Could not find network $Network, unable to delete"}
+        Set-PFStaticRoute -InputObject $InputObject -NewObject $PFObject
+    }
+}
+
+
 Function Write-PFStaticRoute{
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
@@ -581,7 +701,7 @@ try{
     if(-not $Flow.ContainsKey($Service)){  Write-Host "Unknown service '$Service'" -ForegroundColor red; exit 2 }
     if(-not $Flow.$Service.ContainsKey($Action)){ Write-Host "Unknown action '$Action' for service '$Service'" -ForegroundColor red; exit 3 }
 
-    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer,$path,$file,$Network,$Gateway,$Description,$Interface,$From,$To,$netmask,$Domain,$DNSServer,$NTPServer,$Alias,$Type,$Address,$Detail,$HostName,$ClientID,$MacAddr
+    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer,$path,$file,$Network,$Gateway,$Description,$Interface,$From,$To,$netmask,$Domain,$DNSServer,$NTPServer,$Alias,$Type,$Address,$Detail,$HostName,$ClientID,$MacAddr,$Protocol, $SourceAddress, $DestAddress, $DestPort, $NatIp, $NatPort
  
 } catch { 
     Write-Error $_.Exception 

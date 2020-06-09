@@ -267,10 +267,10 @@ class PFNATRule {
     [string]$LocalPort
     [PFinterface]$interface
     [string]$Description
-    [String]$updated
+    [hashtable]$updated
     [PFFirewall]$FirewallRule
 #    [String]$FirewallRule # could be a PFFirewall object
-    [String]$created
+    [hashtable]$created
 
     static [string]$Section = "nat/rule"
     # property name as it appears in the XML, insofar it's different from the object's property name

@@ -292,8 +292,7 @@ function ConvertFrom-PFObject{
             $ReturnObject.$PFSection = $PFHashValue
         }
         # Take out the _key value's
-        
-        Remove__Key -Hashtable $ReturnObject
+        Remove-_Key -Hashtable $ReturnObject
 
         [xml]$XMLToUpload = ConvertTo-XmlRpcType -InputObject $ReturnObject
         $XMLToUpload.Save("NewAll.xml") # Temporary save to easaly open the xml file in a more visual editor, This should be the command to upload to the PFsense 
@@ -301,7 +300,7 @@ function ConvertFrom-PFObject{
     }
 }
 
-Function Remove__Key{
+Function Remove-_Key{
     <#
     This function remove's the _key value's from the return object
     #>
@@ -310,7 +309,7 @@ Function Remove__Key{
         foreach($Key in $Hashtable.keys){
             try{ # it can happen that $hashtable.Item($key) is a $Null value, this creates a error on the gettype(), we catch those and can continue with the code. this is not a hashtable
                 if($hashtable.Item($Key).gettype() -eq [hashtable]){
-                    Remove__Key -Hashtable $hashtable.Item($Key) # if it is a hashtable in a hashtable, we go tru that hashtable as well
+                    Remove-_Key -Hashtable $hashtable.Item($Key) # if it is a hashtable in a hashtable, we go tru that hashtable as well
                 }
             }catch{}
             if("_key" -eq $Key){ # if the $key is _key, we use that internally in the script, there have to be removed from the hashtables
@@ -501,7 +500,7 @@ function Get-PFInterface {
         # However, in the configuration for these services (e.g. DNS server) it appears as string "all"
         # We need to manually create these "static interfaces" to satisfy the type definition/conversion on the PF* where an interface is defined
         # as [PFInterface]$Interface (or [PFInterface[]]$Interface in some cases.)
-        (@{ all = 'All'; lo0 = 'Loopback' }).GetEnumerator() | ForEach-Object {
+        (@{ all = 'All'; lo0 = 'Loopback'; '(self)' = "ThisFirewall" }).GetEnumerator() | ForEach-Object {
             $EphemeralInterface =  New-Object -TypeName "PFInterface" -Property @{ Name = $_.Key; Description = $_.Value }
             $Interfaces.Add($EphemeralInterface) | Out-Null
         }
@@ -611,7 +610,7 @@ function Set-PFDHCPd {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
-        [Parameter(Mandatory=$true)][psobject]$NewObject)
+        [Parameter(Mandatory=$False)][psobject]$NewObject)
     Begin{
         $UploadObjects = New-Object System.Collections.ArrayList 
     }
@@ -638,7 +637,7 @@ function Set-PFDHCPd {
                             $StaticmapHashtable[$_.Name] = $_.Value
                         }
                     }
-                    if([string]::IsNullOrWhitespace($Object.staticmap.Macaddr)){$Object._staticmaps = $StaticmapHashtable}
+                    if([string]::IsNullOrWhitespace($Object._staticmaps.Macaddr)){$Object._staticmaps = $StaticmapHashtable}
                     else{$Object._staticmaps += $StaticmapHashtable}
                 }
             }
@@ -749,6 +748,40 @@ function Get-PFNATRule {
     return $Rules
     }
 } 
+
+function Set-PFNATRule {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$False)][psobject]$NewObject
+    )
+    begin{
+        $Interface = get-pfinterface -server $InputObject
+    }
+    process {
+        $NewObject
+        foreach($Object in $NewObject){
+            ("Source","Destination") | foreach {
+                [hashtable]$hashtable = @{
+                    $hashtable.add("Any","")
+                }
+                $hashtable.add("Port",$Object.$($_+"Port"))
+                if($object.$($_+"Address") -eq "any"){}
+                elseif($object.$($_+"Address").split(" ")[0] -in $interface.Description){
+                    if ($object.$($_+"Address").split(" ")[1] -eq "Address"){
+                        $NetworkValue = ((Get-PFInterface -InputObject $InputObject -Description $($object.$($_+"Address").split(" ")[0])).name)+"ip"
+                        }
+                    else{$NetworkValue = $NetworkValue = ((Get-PFInterface -InputObject $InputObject -Description $($object.$($_+"Address").split(" ")[0])).name)}
+                    $hashtable.add("network",$NetworkValue)
+                }
+                else{}
+            }
+        }
+        $NewObject
+        ConvertFrom-PFObject -InputObject $InputObject -PFObject $UploadObjects -PFObjectType "PFAlias"
+    }
+}
+
 function Get-PFStaticRoute {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
@@ -768,16 +801,7 @@ function Set-PFStaticRoute {
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
         [Parameter(Mandatory=$true)][psobject]$NewObject)
     process{
-        $PFObject = Get-PFStaticRoute -Server $PFserver
-        if($NewObject.Network -in $PFObject.Network){
-            $Index = 0
-            While($PFObject[$index]){
-                if($PFObject[$index].Network -eq $NewObject.Network){$PFObject[$index] = $NewObject}
-                $index++
-            }
-        }
-        else{$PFObject = $PFObject + $NewObject}
-        ConvertFrom-PFObject -InputObject $InputObject -PFObject $PFObject -PFObjectType "PFStaticRoute"
+        ConvertFrom-PFObject -InputObject $InputObject -PFObject $NewObject -PFObjectType "PFStaticRoute"
     }    
 }
 

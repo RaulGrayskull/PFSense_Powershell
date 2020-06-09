@@ -1,56 +1,62 @@
 $Flow = @{
     "All" = @{
-        "Save" = "param(`$InputObject, `$path, `$file); Save-PFAll -InputObject `$InputObject -path `$path -File `$file"
-        "Restore" = "param(`$InputObject, `$path, `$file); Restore-PFAll -InputObject `$InputObject -path `$path -File `$file"
+        "Save" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort); Save-PFAll -InputObject `$InputObject -path `$path -File `$file"
+        "Restore" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort); Restore-PFAll -InputObject `$InputObject -path `$path -File `$file"
     }
 
 
     "alias" = @{
-        "print" = "param(`$InputObject); Write-PFAlias -InputObject `$InputObject"
-        "Add" = "param(`$InputObject,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Entry,`$Type) ; Add-pfalias -InputObject `$InputObject -Alias `$Alias -Type `$Type -address `$Address -detail `$detail -Description `$Description"
-        "Delete" = "param(`$InputObject,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Entry,`$Type) ; Delete-pfalias -InputObject `$InputObject -Alias `$Alias"
-        "AddEntry" = "param(`$InputObject,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Entry,`$Type) ; AddEntry-pfalias -InputObject `$InputObject -Alias `$Alias -address `$Address -detail `$detail"
-        "DeleteEntry" = "param(`$InputObject,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Entry,`$Type) ; DeleteEntry-pfalias -InputObject `$InputObject -Alias `$Alias -detail `$detail"
+        "print" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort); Write-PFAlias -InputObject `$InputObject"
+        "Add" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort) ; Add-pfalias -InputObject `$InputObject -Alias `$Alias -Type `$Type -address `$Address -detail `$detail -Description `$Description"
+        "Delete" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort) ; Delete-pfalias -InputObject `$InputObject -Alias `$Alias"
+        "AddEntry" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort) ; AddEntry-pfalias -InputObject `$InputObject -Alias `$Alias -address `$Address -detail `$detail"
+        "DeleteEntry" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort) ; DeleteEntry-pfalias -InputObject `$InputObject -Alias `$Alias -detail `$detail"
     }
 
     "dhcpd" = @{
-        "print" = "param(`$InputObject); Write-PFDHCPd -InputObject `$InputObject"
-        "Add" = "param(`$InputObject,`$Network,`$Gateway,`$Description) ; Add-PFDHCPd -InputObject `$InputObject -Interface `$Interface -From `$From -To `$To -netmask `$netmask -Domain `$Domain -Gateway `$Gateway -DNSServer `$DNSServer -NTPServer `$NTPServer "
-        "Set" = "param(`$InputObject,`$Network,`$Gateway,`$Description) ; Add-PFDHCPd -InputObject `$InputObject -Interface `$Interface -From `$From -To `$To -netmask `$netmask -Domain `$Domain -Gateway `$Gateway -DNSServer `$DNSServer -NTPServer `$NTPServer "
+        "print" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort); Write-PFDHCPd -InputObject `$InputObject"
+        "Add" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort) ; Add-PFDHCPd -InputObject `$InputObject -Interface `$Interface -From `$From -To `$To -netmask `$netmask -Domain `$Domain -Gateway `$Gateway -DNSServer `$DNSServer -NTPServer `$NTPServer "
+        "Set" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort) ; Add-PFDHCPd -InputObject `$InputObject -Interface `$Interface -From `$From -To `$To -netmask `$netmask -Domain `$Domain -Gateway `$Gateway -DNSServer `$DNSServer -NTPServer `$NTPServer "
+        "Enable" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort) ; EnableOrDisable-PFDHCPd -InputObject `$InputObject -Interface `$Interface -EnableOrDisable `$True"
+        "Disable" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort) ; EnableOrDisable-PFDHCPd -InputObject `$InputObject -Interface `$Interface -EnableOrDisable `$False"
 
     } 
     "dhcpStaticMap" = @{
-        "print" = "param(`$InputObject); Write-PFDHCPstaticmap -InputObject `$InputObject"
-        "Add" = "param(`$InputObject,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr) ; Add-PFDHCPstaticmap -InputObject `$InputObject -Interface `$Interface -Hostname `$Hostname -Domain `$Domain -ClientID `$ClientID -MACaddr `$MACaddr -Address `$Address -Description `$Description -Gateway `$Gateway -DNSserver `$DNSserver -NTPServer `$NTPServer"
-        "Delete" = "param(`$InputObject,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr) ; Delete-PFDHCPstaticmap -InputObject `$InputObject -Interface `$Interface -Hostname `$Hostname -Domain `$Domain -ClientID `$ClientID -MACaddr `$MACaddr -Address `$Address -Description `$Description -Gateway `$Gateway -DNSserver `$DNSserver -NTPServer `$NTPServer"
+        "print" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort); Write-PFDHCPstaticmap -InputObject `$InputObject"
+        "Add" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort) ; Add-PFDHCPstaticmap -InputObject `$InputObject -Interface `$Interface -Hostname `$Hostname -Domain `$Domain -ClientID `$ClientID -MACaddr `$MACaddr -Address `$Address -Description `$Description -Gateway `$Gateway -DNSserver `$DNSserver -NTPServer `$NTPServer"
+        "Edit" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort) ; Add-PFDHCPstaticmap -InputObject `$InputObject -Interface `$Interface -Hostname `$Hostname -Domain `$Domain -ClientID `$ClientID -MACaddr `$MACaddr -Address `$Address -Description `$Description -Gateway `$Gateway -DNSserver `$DNSserver -NTPServer `$NTPServer"
+        "Delete" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort) ; Delete-PFDHCPstaticmap -InputObject `$InputObject -Interface `$Interface -MACaddr `$MACaddr"
     }  
     "dnsResolver" = @{
-        "print" = "param(`$InputObject); Write-PFUnbound -InputObject `$InputObject"
+        "print" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort); Write-PFUnbound -InputObject `$InputObject"
     }    
     "dnsResolverHost" = @{
-        "print" = "param(`$InputObject); Write-PFUnboundHost -InputObject `$InputObject"
+        "print" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort); Write-PFUnboundHost -InputObject `$InputObject"
     }   
     "Firewall" = @{
-        "print" = "param(`$InputObject); Write-PFFirewall -InputObject `$InputObject"
+        "print" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort); Write-PFFirewall -InputObject `$InputObject"
     } 
 
     "gateway" = @{
-        "print" = "param(`$InputObject); Write-PFGateway -InputObject `$InputObject"
+        "print" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort); Write-PFGateway -InputObject `$InputObject"
     }
 
     "interface" = @{
-        "print" = "param(`$InputObject); Write-PFInterface -InputObject `$InputObject"
+        "print" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort); Write-PFInterface -InputObject `$InputObject"
     }
 
     "portfwd" = @{
-        "print" = "param(`$InputObject); Write-PFNatRule -InputObject `$InputObject"
+        "print" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort); Write-PFNatRule -InputObject `$InputObject"
+        "Add" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort); Add-PFNatRule -InputObject `$InputObject -Interface `$Interface -Protocol `$Protocol -SourceAddress `$SourceAddress -SourcePort `$SourcePort -DestAddress `$DestAddress -DestPort `$DestPort -NatIp `$NatIp -NatPort `$NatPort -Description `$Description"
     }    
 
     "StaticRoute" = @{
-        "print" = "param(`$InputObject); Write-PFStaticRoute -InputObject `$InputObject"
-        "Add" = "param(`$InputObject,`$Network,`$Gateway,`$Description) ; Add-PFStaticRoute -InputObject `$InputObject -Network `$Network -Gateway `$Gateway -Description `$Description"
+        "print" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort); Write-PFStaticRoute -InputObject `$InputObject"
+        "Add" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort) ; Add-PFStaticRoute -InputObject `$InputObject -Network `$Network -Gateway `$Gateway -Description `$Description"
+        "Edit" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort) ; Add-PFStaticRoute -InputObject `$InputObject -Network `$Network -Gateway `$Gateway -Description `$Description"
+        "Delete" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort) ; Delete-PFStaticRoute -InputObject `$InputObject -Network `$Network"
     }
     "Vlan" = @{
-        "print" = "param(`$InputObject); Write-PFVlan -InputObject `$InputObject"
+        "print" = "param(`$InputObject,`$path,`$file,`$Network,`$Gateway,`$Description,`$Interface,`$From,`$To,`$netmask,`$Domain,`$DNSServer,`$NTPServer,`$Alias,`$Type,`$Address,`$Detail,`$HostName,`$ClientID,`$MacAddr,`$Protocol,`$SourceAddress,`$DestAddress,`$DestPort,`$NatIp,`$NatPort); Write-PFVlan -InputObject `$InputObject"
     }
 }

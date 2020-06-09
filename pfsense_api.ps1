@@ -762,11 +762,13 @@ function Set-PFNATRule {
         $NewObject
         foreach($Object in $NewObject){
             ("Source","Destination") | foreach {
-                [hashtable]$hashtable = @{
+                [hashtable]$hashtable = @{}
+                if($Object.$($_+"Port")){
+                    $hashtable.add("Port",$Object.$($_+"Port"))
+                }
+                if($object.$($_+"Address") -eq "any"){
                     $hashtable.add("Any","")
                 }
-                $hashtable.add("Port",$Object.$($_+"Port"))
-                if($object.$($_+"Address") -eq "any"){}
                 elseif($object.$($_+"Address").split(" ")[0] -in $interface.Description){
                     if ($object.$($_+"Address").split(" ")[1] -eq "Address"){
                         $NetworkValue = ((Get-PFInterface -InputObject $InputObject -Description $($object.$($_+"Address").split(" ")[0])).name)+"ip"

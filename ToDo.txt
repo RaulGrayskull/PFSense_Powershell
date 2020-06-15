@@ -1,11 +1,12 @@
 Alias:
-Done
+    Unique = Name
+Split add & edit
 
 Dhcpd:
-Done
+Split add & edit
 
 DhcpStaticMap:
-Done
+Split add & edit
 
 DnsResolver:
 crashes on pfsense_api line 121 at hosts: Cannot find an overload for "Add" and the argument count: "2"
@@ -17,20 +18,24 @@ It looks to happen if a host has no aliases
 Firewall:
 
 Gateway:
+Print: Done
+Add: 
+Edit: 
+    Unique is:  -Name
+                -IP
+                -monitor
+Delete: 
 
 Interface:
 
 Portfwd:
-Source Type: 
-    if sourcetype is network, then a local network name is used, like opt1. if opt1ip then it is still network, but with a opt1 address. the network can also be self for this firewall
-    if sourcetype is address, a ipaddress our networkaddress with subnet can be enterd.
-Print:
-Add:
-Edit:
-Delete:
+Print: Done
+Add: look for duplicate and give error message
+Delete: Done
+Edit: There is no Unique identifier. so edit is as hard to select and edit.
 
 StaticRoute:
-Done
+Split add & edit
 
 Vlan's:
 Empty.

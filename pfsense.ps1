@@ -31,6 +31,9 @@ Param
     [Parameter(Mandatory=$false, HelpMessage='Destination Port')] [string] $DestPort,
     [Parameter(Mandatory=$false, HelpMessage='The Local Ip Address')] [string] $NatIp,
     [Parameter(Mandatory=$false, HelpMessage='The Local Port')] [string] $NatPort,
+    [Parameter(Mandatory=$false, HelpMessage='The Monitoring address')] [string] $Monitor,
+    [Parameter(Mandatory=$false, HelpMessage='The Weight')] [string] $Weight,
+    [Parameter(Mandatory=$false, HelpMessage='The Name of the entry')] [string] $Name,
     [Switch] $NoTLS,
     [switch] $SkipCertificateCheck
     )
@@ -50,6 +53,36 @@ else {
 . .\flow.ps1
 
 Function Add-PFAlias{
+    <#
+    .SYNOPSIS
+    The Add-PFAlias function add's a new alias to the pfsense.
+
+    .DESCRIPTION
+    The Add-PFAlias function add's a new alias to the pfsense.
+    it also check's if the alias name does not excists yet, the name is a unique id.
+
+    .PARAMETER Alias
+    The Name of the Alias
+
+    .PARAMETER Type
+    The Type of the alias, could be Host, Network or Port
+
+    .PARAMETER Address
+    The IP, Network address or the Port number
+
+    .PARAMETER Detail
+    The description of the address value
+
+    .PARAMETER Description
+    The description of the Alias
+    
+    .EXAMPLE
+    ./pfsense.ps1' -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service alias -action add -Alias UploadTest -Type Host -address 192.168.0.5 -Detail 'To test XMLRPC' -Description 'Test the upload of a alias' -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+    
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
@@ -74,16 +107,84 @@ Function Add-PFAlias{
         $NewObject = New-Object -TypeName "PFAlias" -Property $Properties
         $PFObject = Get-PFAlias -Server $PFserver
         if($NewObject.name -in $PFObject.name){
-            $Index = 0
-            While($PFObject[$index]){
-                if($PFObject[$index].name -eq $NewObject.name){$PFObject[$index] = $NewObject}
-                $index++
-            }
+            throw "$($NewObject.name) Already excists, you could use edit to change it value's"
         }
         else{$PFObject = $PFObject + $NewObject}
         Set-PFAlias -InputObject $PFserver -PFObject $PFObject
     }
 }
+
+Function Edit-PFAlias{
+        <#
+    .SYNOPSIS
+    The Add-PFAlias function add's a new alias to the pfsense.
+
+    .DESCRIPTION
+    The edit-PFAlias function edit's a excisting alias on the pfsenes.
+    first it check's if the alias excisits, the unique identifier is the name.
+    If the Address and Detail are enterd these will overwrite the excisting one's
+
+    .PARAMETER Alias
+    The Name of the Alias
+
+    .PARAMETER Type
+    The Type of the alias, could be Host, Network or Port
+
+    .PARAMETER Address
+    The IP, Network address or the Port number
+
+    .PARAMETER Detail
+    The description of the address value
+
+    .PARAMETER Description
+    The description of the Alias
+    
+    .EXAMPLE
+    ./pfsense.ps1' -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service alias -action edit -Alias UploadTest -Type Host -address 192.168.0.5 -Detail 'To test XMLRPC' -Description 'Test the upload of a alias' -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+    
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$true, HelpMessage='The Alias Name')][string]$Alias,
+        [Parameter(Mandatory=$false, HelpMessage='Type')][string]$Type,
+        [Parameter(Mandatory=$false, HelpMessage='Address')] [string] $Address,
+        [Parameter(Mandatory=$false, HelpMessage='Detail - not the description')] [string] $Detail,
+        [Parameter(Mandatory=$false)][String]$Description
+    )
+    Process{
+        if($address -and $Detail){ # it is not mandatory to upload a new entry object, this can be empty or the excisiting one
+            $Properties = @{
+                _Address = $Address
+                _Detail = $Detail
+            }
+            $EntryObject = New-Object -TypeName "PFAliasEntry" -Property $Properties
+        }
+        $PFObject = Get-PFAlias -Server $PFserver # get the existing Aliasses
+        if($Alias -NotIn $PFObject.name){
+            throw "$($Alias) Could not be found, please check the input or use Add" # if the alias does not excisits we can not edit it and we throw a error
+        }
+        $Index = 0
+        While($PFObject[$index]){
+            if($PFObject[$index].name -eq $Alias){ # loop true all the aliasses, if we find the correct alias, edit it
+                if($EntryObject){ # Only change the Entry object if a now entryobject has been created
+                    $PFObject[$index].Entry = $EntryObject
+                }
+                ("Type","Description") | foreach {
+                    if($($_)){
+                        $PFObject[$index].$_ = get-variable $_ -valueOnly
+                    }
+                }
+            }
+            $index++
+        }
+        Set-PFAlias -InputObject $PFserver -PFObject $PFObject
+    }
+}
+
 Function AddEntry-PFAlias{
     [CmdletBinding()]
     param (
@@ -422,6 +523,43 @@ Function Write-PFFirewall{
     }
 }
 
+Function Add-PFGateway{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$false, HelpMessage='The Name for this entry')] [string] $Name,
+        [Parameter(Mandatory=$True, HelpMessage='The Interface the port forward is going to be created on')] [string]$Interface,
+        [Parameter(Mandatory=$false, HelpMessage='The Ip Protocol, inet or inet6')] [string] $Protocol,
+        [Parameter(Mandatory=$false, HelpMessage='The gateway address')] [string] $Gateway,
+        [Parameter(Mandatory=$false, HelpMessage='The Monitoring address')] [string] $Monitor,
+        [Parameter(Mandatory=$false, HelpMessage='The weight of the route')] [string] $Weight,
+        [Parameter(Mandatory=$false, HelpMessage='The description of the route')] [string] $Description
+        )
+    Begin{
+    }
+    process{
+        $Properties = @{
+            Name = $name
+            Interface = $($InputObject | Get-PFInterface -Description $Interface)
+            ipProtocol = $Protocol
+            Gateway = $Gateway
+            Monitor = $Monitor
+            Weight = $Weight
+            Description = $Description
+        }
+    $new = New-Object -TypeName "PFGateway" -Property $Properties
+    $PFObject = Get-PFGateway -Server $InputObject
+    if($new.name -in $PFObject.name){Throw "The Gateway name: $($new.name) is already in use"}
+    elseif($new.Gateway -in $PFObject.Gateway){Throw "The Gateway address: $($new.Gateway) is already in use"}
+    elseif($new.Monitor -in $PFObject.Monitor){Throw "The Gateway monitoring address: $($new.Monitor) is already in use"}
+    else{
+        $PFObject += $new
+    }
+    Set-PFGateway -InputObject $InputObject -NewObject $PFObject
+    }
+}
+
+
 Function Write-PFGateway{
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
@@ -432,7 +570,6 @@ Function Write-PFGateway{
         $PFObject = get-pfgateway -Server $InputObject
         $exclude = ("")
         foreach($Rule in $PFObject){
-            # Real interfaces have a physical interface, if not, do not display
             if($rule.Interface){
                 $Collection.Add($Rule) | out-null
             }
@@ -500,6 +637,56 @@ Function Add-PFNatRule{
     Set-PFNatRule -InputObject $InputObject -NewObject $PFObject
     }
 }
+
+
+Function Delete-PFNatRule{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$True, HelpMessage='The Interface the port forward is going to be created on')] [string]$Interface,
+        [Parameter(Mandatory=$false, HelpMessage='Network protocol like: TCP, UDP, ICMP')] [string] $Protocol,
+        [Parameter(Mandatory=$false, HelpMessage='Source Address')] [string] $SourceAddress,
+        [Parameter(Mandatory=$false, HelpMessage='Source Port')] [string] $SourcePort,
+        [Parameter(Mandatory=$false, HelpMessage='Destination Address')] [string] $DestAddress,
+        [Parameter(Mandatory=$false, HelpMessage='Destination Port')] [string] $DestPort,
+        [Parameter(Mandatory=$false, HelpMessage='The Local Ip Address')] [string] $NatIp,
+        [Parameter(Mandatory=$false, HelpMessage='The Local Port')] [string] $NatPort,
+        [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Description
+        )
+    Begin{
+    }
+    process{
+        $Properties = @{
+            Interface = $($InputObject | Get-PFInterface -Description $Interface)
+            Protocol = $Protocol
+            SourceAddress = $SourceAddress
+            SourcePort = $SourcePort
+            DestinationAddress = $DestAddress
+            DestinationPort = $DestPort
+            target = $NatIp
+            LocalPort = $NatPort
+            Description = $Description
+        }
+    $Delete = New-Object -TypeName "PFNATRule" -Property $Properties
+    $PFOriginal = get-PFNATRule -Server $InputObject
+#    $Delete = $($Delete | Select-Object -Property * -ExcludeProperty "Source","Destination","Description","updated","created","FirewallRule")
+    
+    $PFObject = $PFOriginal | Where-Object {
+        ($_.Protocol -ne $Delete.protocol) -or
+        ($_.SourceAddress -ne $Delete.SourceAddress) -or
+        ($_.SourcePort -ne $Delete.SourcePort) -or
+        ($_.DestinationAddress -ne $Delete.DestinationAddress) -or
+        ($_.DestinationPort -ne $Delete.DestinationPort) -or
+        ($_.target -ne $Delete.target)
+#        foreach($key in $Delete.PSobject.properties.name){
+#            $_.$key -ne $Delete.$key
+#            }
+        }
+
+    Set-PFNatRule -InputObject $InputObject -NewObject $PFObject
+    }
+}
+
 
 Function Write-PFNatRule{
     [CmdletBinding()]
@@ -701,10 +888,10 @@ try{
     if(-not $Flow.ContainsKey($Service)){  Write-Host "Unknown service '$Service'" -ForegroundColor red; exit 2 }
     if(-not $Flow.$Service.ContainsKey($Action)){ Write-Host "Unknown action '$Action' for service '$Service'" -ForegroundColor red; exit 3 }
 
-    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer,$path,$file,$Network,$Gateway,$Description,$Interface,$From,$To,$netmask,$Domain,$DNSServer,$NTPServer,$Alias,$Type,$Address,$Detail,$HostName,$ClientID,$MacAddr,$Protocol, $SourceAddress, $DestAddress, $DestPort, $NatIp, $NatPort
+    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer,$path,$file,$Network,$Gateway,$Description,$Interface,$From,$To,$netmask,$Domain,$DNSServer,$NTPServer,$Alias,$Type,$Address,$Detail,$HostName,$ClientID,$MacAddr,$Protocol,$SourceAddress,$DestAddress,$DestPort,$NatIp,$NatPort,$Weight,$Monitor,$Name
  
 } catch { 
-    Write-Error $_.Exception 
+    Write-Error $_.Exception.Message
     exit 1
 }
 

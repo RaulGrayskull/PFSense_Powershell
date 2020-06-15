@@ -441,7 +441,7 @@ Function Restore-PFAll{
             Write-Error "Could not find path"
         }
         [xml]$RestoreXML = Get-Content "$path\$file"
-        $InputObject.XMLConfig = $RestoreXML
+        $InputObject.XMLConfig = $RestoreXML # should be the invoke xml-rpc function, but for now this works for testing
     }
 }
 
@@ -684,6 +684,17 @@ function Get-PFFirewall {
     }
 }
 
+function Set-PFGateway {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
+        [Parameter(Mandatory=$true)][psobject]$NewObject)
+    process{
+        $UploadObject = $NewObject | Where-Object {$_.interface}
+        ConvertFrom-PFObject -InputObject $InputObject -PFObject $UploadObject -PFObjectType "PFGateway"
+    }    
+}
+
 function Get-PFGateway {
     [CmdletBinding()]
     param (
@@ -756,31 +767,55 @@ function Set-PFNATRule {
         [Parameter(Mandatory=$False)][psobject]$NewObject
     )
     begin{
+        $UploadObjects = New-Object System.Collections.ArrayList 
         $Interface = get-pfinterface -server $InputObject
+        $Alias = Get-PFAlias -server $InputObject
     }
     process {
-        $NewObject
         foreach($Object in $NewObject){
-            ("Source","Destination") | foreach {
+            foreach($SourceDestination in "Source","Destination") {
                 [hashtable]$hashtable = @{}
-                if($Object.$($_+"Port")){
-                    $hashtable.add("Port",$Object.$($_+"Port"))
+                if($Object.$($SourceDestination+"Port")){
+                    $hashtable.add("Port",$Object.$($SourceDestination+"Port"))
                 }
-                if($object.$($_+"Address") -eq "any"){
+                if($object.$($SourceDestination+"Address") -eq "any"){
                     $hashtable.add("Any","")
                 }
-                elseif($object.$($_+"Address").split(" ")[0] -in $interface.Description){
-                    if ($object.$($_+"Address").split(" ")[1] -eq "Address"){
-                        $NetworkValue = ((Get-PFInterface -InputObject $InputObject -Description $($object.$($_+"Address").split(" ")[0])).name)+"ip"
+                elseif($object.$($SourceDestination+"Address").split(" ")[0] -in $interface.Description){
+                    if ($object.$($SourceDestination+"Address").split(" ")[1] -eq "Address"){
+                        $NetworkValue = ((Get-PFInterface -InputObject $InputObject -Description $($object.$($SourceDestination+"Address").split(" ")[0])).name)+"ip"
                         }
-                    else{$NetworkValue = $NetworkValue = ((Get-PFInterface -InputObject $InputObject -Description $($object.$($_+"Address").split(" ")[0])).name)}
+                    else{$NetworkValue = ((Get-PFInterface -InputObject $InputObject -Description $($object.$($SourceDestination+"Address").split(" ")[0])).name)}
                     $hashtable.add("network",$NetworkValue)
                 }
-                else{}
+                else{# if $object.$($_+"Address").split(" ")[0] is not a interface description value, it must be a ip address or a alias value
+                    try{ # we try to convert the $object.$($_+"Address") to a ip address, if this fails it must be a alias 
+                        if($object.$($SourceDestination+"Address") -match "/"){ # here we see if it is a subnetted address
+                            if(([ipaddress]$object.$($SourceDestination+"Address").split("/")[0]) -and ($object.$($SourceDestination+"Address").split("/")[1] -in 1..128)){
+                                $NetworkValue = $object.$($SourceDestination+"Address")
+                            }
+                        }
+                        else{ # or a host address
+                            if([ipaddress]$object.$($SourceDestination+"Address")){
+                                $NetworkValue = $object.$($SourceDestination+"Address")
+                            }
+                        }
+                    }
+                    catch{ # 
+                        if($object.$($SourceDestination+"Address") -in $alias.name){
+                            $NetworkValue = $object.$($SourceDestination+"Address")
+                        }
+                        else{
+                            throw "Could not find $($object.$($SourceDestination+"Address")) as a internal network or a alias"
+                        }
+                    }
+                    $hashtable.add("Address",$NetworkValue)
+                }
+                $Object.$($SourceDestination) = $hashtable
             }
+            $UploadObjects.add($($Object | Select-Object -Property * -ExcludeProperty "SourceAddress","SourcePort","DestinationAddress","DestinationPort")) | out-null
         }
-        $NewObject
-        ConvertFrom-PFObject -InputObject $InputObject -PFObject $UploadObjects -PFObjectType "PFAlias"
+        ConvertFrom-PFObject -InputObject $InputObject -PFObject $UploadObjects -PFObjectType "PFNATRule"
     }
 }
 

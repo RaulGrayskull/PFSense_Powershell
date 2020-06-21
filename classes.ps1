@@ -138,10 +138,10 @@ class PFFirewall {
     [string]$tag
     [string]$maxsrcstates
     [string]$icmptype
-    [string]$created
+    [hashtable]$created
     [string]$tracker
     [string]$max
-    [string]$updated
+    [hashtable]$updated
     [string]$tagged
     [string]$statetimeout
     [string]$maxsrcnodes

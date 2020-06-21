@@ -1,12 +1,11 @@
 Alias:
-    Unique = Name
-Split add & edit
+Done
 
 Dhcpd:
-Split add & edit
+Add is done by the interface, if we set that to a fixed IPaddress, it is added to the dhcpd, if we set it to dhcp it is deleted from the dhcpd
 
 DhcpStaticMap:
-Split add & edit
+Done
 
 DnsResolver:
 crashes on pfsense_api line 121 at hosts: Cannot find an overload for "Add" and the argument count: "2"
@@ -16,6 +15,8 @@ crashes (AliasesDescription = "aliases/item/Description" still has a xmlelement)
 It looks to happen if a host has no aliases
 
 Firewall:
+Test the order.
+
 
 Gateway:
 Print: Done
@@ -26,11 +27,9 @@ Edit:
                 -monitor
 Delete: 
 
-Interface:
-
 Portfwd:
 Print: Done
-Add: look for duplicate and give error message
+Add: look for duplicate and give error message, there can be duplicate's in the webbrowser
 Delete: Done
 Edit: There is no Unique identifier. so edit is as hard to select and edit.
 
@@ -40,3 +39,4 @@ Split add & edit
 Vlan's:
 Empty.
 
+Interface:

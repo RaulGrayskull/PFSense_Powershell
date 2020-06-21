@@ -252,6 +252,7 @@ function ConvertFrom-PFObject{
                 switch($Property.TypeNameOfValue){
                     "PFGateway"     { $PropertyTypedValueConverted = $Property.value.name } 
                     "PFInterface"   { $PropertyTypedValueConverted = $Property.value.Description}
+                    "PFInterface[]" { $PropertyTypedValueConverted = $Property.value.Description -join ','}
 #                    "PFFirewall"    {}
                     default         { $PropertyTypedValueConverted = $Property.value}
                 }
@@ -615,16 +616,7 @@ function Set-PFDHCPd {
         $UploadObjects = New-Object System.Collections.ArrayList 
     }
     process{
-        $PFObject = Get-PFdhcpd -Server $PFserver
-        if($NewObject.Interface.Description -in $PFObject.Interface.Description){
-            $Index = 0
-            While($PFObject[$index]){
-                if($PFObject[$index].Interface.Description -eq $NewObject.Interface.Description){$PFObject[$index] = $NewObject}
-                $index++
-            }
-        }
-        else{$PFObject = $PFObject + $NewObject}
-        foreach($Object in $PFObject){
+        foreach($Object in $NewObject){
             if($Object.staticmaps){
                 $Object._staticmaps = @{}
                 $Object.staticmaps | foreach{
@@ -646,6 +638,47 @@ function Set-PFDHCPd {
         ConvertFrom-PFObject -InputObject $InputObject -PFObject $UploadObjects -PFObjectType "PFDHCPd"
     }    
 }
+
+function Set-PFFirewall {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$False)][psobject]$NewObject
+    )
+    begin{
+        $UploadObjects = New-Object System.Collections.ArrayList 
+    }
+    process {
+        $Interface = Get-PFInterface -server $InputObject
+        foreach($Object in $NewObject){
+            foreach($SourceDestination in "Source","Destination") {
+                [hashtable]$hashtable = @{}
+                if($Object.$($SourceDestination+"Port")){
+                    $hashtable.add("Port",$Object.$($SourceDestination+"Port"))
+                }
+                if($object.$($SourceDestination+"Address") -eq "any"){
+                    $hashtable.add("Any","")
+                }
+                elseif($object.$($SourceDestination+"Address").split(" ")[0] -in $interface.Description){
+                    if ($object.$($SourceDestination+"Address").split(" ")[1] -eq "Address"){
+                        $NetworkValue = ((Get-PFInterface -InputObject $InputObject -Description $($object.$($SourceDestination+"Address").split(" ")[0])).name)+"ip"
+                        }
+                    else{$NetworkValue = ((Get-PFInterface -InputObject $InputObject -Description $($object.$($SourceDestination+"Address").split(" ")[0])).name)}
+                    $hashtable.add("network",$NetworkValue)
+                }
+                else{
+                    $NetworkValue = $object.$($SourceDestination+"Address")
+                    $hashtable.add("Address",$NetworkValue)
+                }
+                $Object.$($SourceDestination) = $hashtable
+            }
+            $UploadObjects.add($($Object | Select-Object -Property * -ExcludeProperty "SourceAddress","SourcePort","DestinationAddress","DestinationPort")) | out-null
+        }
+        ConvertFrom-PFObject -InputObject $InputObject -PFObject $UploadObjects -PFObjectType "PFFirewall"
+    }
+}
+
+
 
 function Get-PFFirewall {
     [CmdletBinding()]

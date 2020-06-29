@@ -2,6 +2,8 @@ Alias:
 Done
 
 Dhcpd:
+If a dhcpd has only one staticmap on a interface it crashes the script: 
+    Write-Error: Method invocation failed because [System.Collections.Hashtable] does not contain a method named 'Split'.
 Add is done by the interface, if we set that to a fixed IPaddress, it is added to the dhcpd, if we set it to dhcp it is deleted from the dhcpd
 
 DhcpStaticMap:
@@ -15,17 +17,17 @@ crashes (AliasesDescription = "aliases/item/Description" still has a xmlelement)
 It looks to happen if a host has no aliases
 
 Firewall:
-Test the order.
+Done.
 
 
 Gateway:
 Print: Done
-Add: 
-Edit: 
+Add: Done
+Edit: Done
     Unique is:  -Name
                 -IP
                 -monitor
-Delete: 
+Delete: Done
 
 Portfwd:
 Print: Done

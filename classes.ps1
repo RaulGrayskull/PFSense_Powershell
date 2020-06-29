@@ -112,6 +112,7 @@ class PFdhcpStaticMap{
 }
 
 class PFFirewall {
+    [int]$lineNumber
     [bool]$IsFloating = $false
     [bool]$IsQuick = $false
     [bool]$IsDisabled = $false
@@ -225,6 +226,7 @@ class PFInterface {
     [string]$Trackv6Interface
     [string]$Trackv6PrefixId
     [bool]$BlockBogons
+    [bool]$blockpriv
     [string]$Media
     [string]$MediaOpt
     [string]$DHCPv6DUID

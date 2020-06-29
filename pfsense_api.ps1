@@ -563,17 +563,20 @@ function Set-PFAlias {
         # Split Entry back into alias and detail array's
         foreach($Object in $PFObject){
             $index = 0
-            while($Object.Entry[$index]){
-                if($index -eq 0){ # first entry we replace the _address and _detail
-                    $_Address = $Object.Entry[$index]._Address.ToString()
-                    $_Detail = $Object.Entry[$index]._Detail.ToString()
+            try{ # use a try here because not all object's must have a entry, if not than a error will be thrown, but we can contineu
+                while($Object.Entry[$index]){
+                    if($index -eq 0){ # first entry we replace the _address and _detail
+                        $_Address = $Object.Entry[$index]._Address.ToString()
+                        $_Detail = $Object.Entry[$index]._Detail.ToString()
+                    }
+                    else{   # all the others we add
+                        $_Address += (" {0}" -f $Object.Entry[$index]._Address)
+                        $_Detail += ("||{0}" -f $Object.Entry[$index]._Detail)
+                    }
+                    $Index++
                 }
-                else{   # all the others we add
-                    $_Address += (" {0}" -f $Object.Entry[$index]._Address)
-                    $_Detail += ("||{0}" -f $Object.Entry[$index]._Detail)
-                }
-                $Index++
             }
+            catch{}
             $UploadObject = [PSCustomObject]@{
                 _Detail = $_Detail
                 _Address = $_Address
@@ -604,6 +607,7 @@ function Get-PFDHCPd {
     }
 }
 
+
 function Set-PFDHCPd {
     <#
     Make the PFobject ready to send to the ConvertFrom-PFObject.
@@ -617,11 +621,21 @@ function Set-PFDHCPd {
     }
     process{
         foreach($Object in $NewObject){
+            if($Object.enable){ # Only do check's if pool in enabled. else value's can be empty
+                # Check if the from address is smaller then the to address
+                if((IpToNumber -ipaddress $Object.RangeFrom) -gt (IpToNumber -ipaddress $Object.RangeTo)){throw "The pool to address must be greather then the pool start address"}
+                # check if the pool addresses are in the interface range
+                if($(IpBand -Ipaddress $Object.interface.IPv4Address -Subnet $Object.interface.IPv4Subnet) -ne $(IpBand -Ipaddress $Object.RangeFrom -Subnet $Object.interface.IPv4Subnet)){Throw "the pool range is not in the same subnet as the interface"}
+                if((IpBand -Ipaddress $Object.interface.IPv4Address -Subnet $Object.interface.IPv4Subnet) -ne (IpBand -Ipaddress $Object.RangeTo -Subnet $Object.interface.IPv4Subnet)){Throw "the pool range is not in the same subnet as the interface"}
+            }
             if($Object.staticmaps){
                 $Object._staticmaps = @{}
                 $Object.staticmaps | foreach{
                     $StaticmapHashtable = @{}
                     $_.psobject.properties | foreach{
+                        if($_.name -eq "IPaddr"){ # Check if the ipaddress of the static map is in the range of the interface
+                            if($(IpBand -Ipaddress $Object.interface.IPv4Address -Subnet $Object.interface.IPv4Subnet) -ne $(IpBand -Ipaddress $_.Value -Subnet $Object.interface.IPv4Subnet)){Throw "the pool range is not in the same subnet as the interface"}
+                        }
                         if($_.name -eq "Interface"){ # The Interface is a internal object and does not need to be uploaded
                             return
                         }
@@ -636,7 +650,7 @@ function Set-PFDHCPd {
             $UploadObjects.add($($Object | Select-Object -Property * -ExcludeProperty "staticmaps"))
         }
         ConvertFrom-PFObject -InputObject $InputObject -PFObject $UploadObjects -PFObjectType "PFDHCPd"
-    }    
+    }
 }
 
 function Set-PFFirewall {
@@ -674,7 +688,8 @@ function Set-PFFirewall {
             }
             $UploadObjects.add($($Object | Select-Object -Property * -ExcludeProperty "SourceAddress","SourcePort","DestinationAddress","DestinationPort")) | out-null
         }
-        ConvertFrom-PFObject -InputObject $InputObject -PFObject $UploadObjects -PFObjectType "PFFirewall"
+        $uploadArray = ($UploadObjects | Sort-Object -Property LineNumber)
+        ConvertFrom-PFObject -InputObject $InputObject -PFObject $uploadArray -PFObjectType "PFFirewall"
     }
 }
 
@@ -688,6 +703,11 @@ function Get-PFFirewall {
         )
     process {
         $Rules = ConvertTo-PFObject -PFObjectType "PFFirewall" -InputObject $InputObject
+        [int]$LineNumber = 0
+        while($rules[$LineNumber]){
+            $rules[$LineNumber].LineNumber = $LineNumber
+            $LineNumber ++
+        }
         foreach($Rule in $Rules){
             ("Source","Destination") | foreach {
                 $Rule.$($_+"Port") = ($Rule.$_.Port) ? $Rule.$_.Port.InnerText : "any"
@@ -1056,4 +1076,30 @@ function TestPFCredential {
 
         return $true
     }    
+}
+
+function IpToNumber{
+    param ([Parameter(Mandatory=$True, HelpMessage='ipaddress')]$Ipaddress)
+    process{
+        [Ipaddress]$Ipaddress = $Ipaddress
+        [int64]$multiply = 1
+        [array]$IPArray = $Ipaddress.GetAddressBytes()
+        [int64]$IpNumber = 0
+        [array]::Reverse($IPArray)
+        foreach($octed in $IPArray){$ipNumber += $octed*$multiply;$multiply *=  256}
+        return $ipNumber
+    }
+}
+
+Function IpBand{
+    param (
+        [Parameter(Mandatory=$True, HelpMessage='ipaddress')][Ipaddress]$Ipaddress,
+        [Parameter(Mandatory=$True, HelpMessage='subnet')][int]$Subnet)
+    process{
+        [net.IPAddress]$Ipaddress = $Ipaddress
+        $Int64 = ([convert]::ToInt64(('1' * $($Subnet) + '0' * (32 - $($Subnet))), 2)) 
+        [net.IPAddress]$subnet = '{0}.{1}.{2}.{3}' -f ([math]::Truncate($Int64 / 16777216)).ToString(), ([math]::Truncate(($Int64 % 16777216) / 65536)).ToString(), ([math]::Truncate(($Int64 % 65536)/256)).ToString(), ([math]::Truncate($Int64 % 256)).ToString()
+        $return = ($Ipaddress.Address -band $subnet.address)
+        return $return
+    }
 }

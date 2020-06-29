@@ -39,6 +39,8 @@ Param
     [Parameter(Mandatory=$false, HelpMessage='if Quick match is enabled')] [Bool] $IsQuick,
     [Parameter(Mandatory=$false, HelpMessage='if it is a floating rule')] [Bool] $IsFloating,
     [Parameter(Mandatory=$false, HelpMessage='The Tracker id of the firewall rule you would like to edit')] [string] $tracker,
+    [Parameter(Mandatory=$false, HelpMessage='The old line number')][Alias('OldLN')] [string] $OldLineNumber,
+    [Parameter(Mandatory=$false, HelpMessage='The new line number')][Alias('NewLN')] [string] $NewLineNumber,
     [Switch] $NoTLS,
     [switch] $SkipCertificateCheck
     )
@@ -91,7 +93,7 @@ Function Add-PFAlias{
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
-        [Parameter(Mandatory=$true, HelpMessage='The Alias Name')][string]$Alias,
+        [Parameter(Mandatory=$true, HelpMessage='The Alias Name')][string]$Name,
         [Parameter(Mandatory=$true, HelpMessage='Type')][string]$Type,
         [Parameter(Mandatory=$false, HelpMessage='Address')] [string] $Address,
         [Parameter(Mandatory=$false, HelpMessage='Detail - not the description')] [string] $Detail,
@@ -102,19 +104,19 @@ Function Add-PFAlias{
             _Address = $Address
             _Detail = $Detail
         }
-        $EntryObject = New-Object -TypeName "PFAliasEntry" -Property $Properties
-        $Properties = @{
-            Name = $Alias
-            Type = $Type
-            Description = $Description
-            Entry = $EntryObject
-        }
-        $NewObject = New-Object -TypeName "PFAlias" -Property $Properties
+        $Entry = New-Object -TypeName "PFAliasEntry" -Property $Properties
         $PFObject = Get-PFAlias -Server $PFserver
-        if($NewObject.name -in $PFObject.name){
+        if($NewObject.name -cin $PFObject.name){
             throw "$($NewObject.name) Already excists, you could use edit to change it value's"
         }
-        else{$PFObject = $PFObject + $NewObject}
+        $Properties = @{}
+        $Object = New-Object -TypeName "PFAlias" -Property $Properties
+        $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                $Properties.add($_.name,$(get-variable $_.name -valueOnly -ErrorAction Ignore)) # The -erroraction Ignore is used because not all properties are variable's 
+        }
+        $NewObject = New-Object -TypeName "PFAlias" -Property $Properties
+
+        $PFObject += $NewObject
         Set-PFAlias -InputObject $PFserver -PFObject $PFObject
     }
 }
@@ -172,18 +174,18 @@ Function Edit-PFAlias{
             $EntryObject = New-Object -TypeName "PFAliasEntry" -Property $Properties
         }
         $PFObject = Get-PFAlias -Server $PFserver # get the existing Aliasses
-        if($Alias -NotIn $PFObject.name){
+        if($Alias -cNotIn $PFObject.name){
             throw "$($Alias) Could not be found, please check the input or use Add" # if the alias does not excisits we can not edit it and we throw a error
         }
-
         foreach($aliasObject in $PFObject){
-            if($aliasObject.name -eq $Alias){ # loop true all the aliasses, if we find the correct alias, edit it
+            if($aliasObject.name -ceq $Alias){ # loop true all the aliasses, if we find the correct alias, edit it
                 if($EntryObject){ # Only change the Entry object if a now entryobject has been created
                     $aliasObject.Entry = $EntryObject
                 }
-                ("Type","Description") | foreach {
-                    if($($_)){
-                        $aliasObject.$_ = get-variable $_ -valueOnly
+                $aliasObject | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                    # Only set if variable is set
+                    if(get-variable $_.name -valueOnly -ErrorAction Ignore){ # Only set object if variable is set. don't override with empty value's
+                        $aliasObject.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
                     }
                 }
             }
@@ -218,10 +220,10 @@ Function Delete-PFAlias{
         [Parameter(Mandatory=$true, HelpMessage='The Alias Name')][string]$Alias
     )
     $PFObject = Get-PFAlias -Server $PFserver
-    if($Alias -NotIn $PFObject.name){
+    if($Alias -cNotIn $PFObject.name){  #Todo: must be case sensivive
         throw "$($Alias) Could not be found, please check the alias name" # if the alias does not excisits we can not delete it, so throw a error
     }
-    $PFObject = $PFObject | where {$Alias -ne $_.name}
+    $PFObject = $PFObject | where {$Alias -cne $_.name}
     Set-PFAlias -InputObject $PFserver -PFObject $PFObject
 }
 
@@ -264,11 +266,11 @@ Function AddEntry-PFAlias{
         }
         $EntryObject = New-Object -TypeName "PFAliasEntry" -Property $Properties
         $PFObject = Get-PFAlias -Server $PFserver
-        if($Alias -NotIn $PFObject.name){
+        if($Alias -cNotIn $PFObject.name){  #Todo: must be case sensivive
             throw "$($Alias) Could not be found, please check the input or Add the alias" # if the alias does not excisits we can not add a entry to it so we throw a error.
         }
         foreach($AliasObject in $PFObject){
-            if($AliasObject.name -eq $Alias){
+            if($AliasObject.name -ceq $Alias){
                 $AliasObject.entry += ($EntryObject)
             }
         }
@@ -312,12 +314,12 @@ Function DeleteEntry-PFAlias{
     )
     Process{
         $PFObject = Get-PFAlias -Server $PFserver
-        if($Alias -NotIn $PFObject.name){
+        if($Alias -cNotIn $PFObject.name){ #Todo: must be case sensivive
             throw "$($Alias) Could not be found, please check the input or Add the alias" # if the alias does not excisits we can not add a entry to it so we throw a error.
         }
         foreach($AliasObject in $PFObject){
-            if($AliasObject.name -eq $Alias){
-                $AliasObject.Entry = $AliasObject.Entry | Where-Object {($Detail -ne $_._Detail) -and ($Address -ne $_._Address)}
+            if($AliasObject.name -ceq $Alias){
+                $AliasObject.Entry = $AliasObject.Entry | Where-Object {($Detail -cne $_._Detail) -and ($Address -cne $_._Address)}
             }
         }
         Set-PFAlias -InputObject $PFserver -PFObject $PFObject
@@ -350,31 +352,42 @@ Function Write-PFAlias{
         foreach($AliasEntry in $PFObject){
             $indexAliasEntry = 0
             $Properties = @{}
-            while($AliasEntry.Entry[$indexAliasEntry]){
-                $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
-                $Property = $_.Name
-                if($indexAliasEntry -eq 0){
-                    if($Property -eq "Entry"){$PropertyValue = $AliasEntry.$Property[$indexAliasEntry]}
-                    else{$PropertyValue = $AliasEntry.$Property}
-                }
-                else{
-                    if($Property -eq "Entry"){
-                        try {$PropertyValue = $AliasEntry.$Property[$indexAliasEntry]}
-                        catch{$PropertyValue = $AliasEntry.$Property}
+            try{ # Try added, if the alias has no entry's it did crash the script
+                while($AliasEntry.Entry[$indexAliasEntry]){
+                    $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
+                        $Property = $_.Name
+                        if($indexAliasEntry -eq 0){
+                            if($Property -eq "Entry"){$PropertyValue = $AliasEntry.$Property[$indexAliasEntry]}
+                            else{$PropertyValue = $AliasEntry.$Property}
+                        }
+                        else{
+                            if($Property -eq "Entry"){
+                                try {$PropertyValue = $AliasEntry.$Property[$indexAliasEntry]}
+                                catch{$PropertyValue = $AliasEntry.$Property}
+                            }
+                            else{
+                                $PropertyValue = "" 
+                            }
+                        }
+                        $Properties.$Property = $PropertyValue
                     }
-                    else{
-                        $PropertyValue = "" 
-                    }
+                $Object = New-Object -TypeName "PFAlias" -Property $Properties
+                $Collection.Add($Object) | Out-Null
+                $indexAliasEntry++
                 }
-                $Properties.$Property = $PropertyValue
             }
-            $Object = New-Object -TypeName "PFAlias" -Property $Properties
-            $Collection.Add($Object) | Out-Null
-            $indexAliasEntry++
+            catch{
+                $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
+                    $Property = $_.Name
+                    $PropertyValue = $AliasEntry.$Property
+                    $Properties.$Property = $PropertyValue
+                }
+                $Object = New-Object -TypeName "PFAlias" -Property $Properties
+                $Collection.Add($Object) | Out-Null
+                $indexAliasEntry++
+            }
         }
-    }
-    $exclude = ("_Address", "_Detail")
-    $Collection | Select-Object -ExcludeProperty $exclude | Format-table *
+    $Collection | Format-table Name,Type,Description,Entry
     }
 
 }
@@ -448,9 +461,10 @@ Function Edit-PFDHCPd{
                     Throw "the pool range is not in the same subnet as the interface"
                 }
                 # Set al the settings
-                ("Gateway","RangeFrom","RangeTo","netmask","Domain","DNSServer","NTPServer") | foreach {
-                    if($($_)){
-                        $dhcpdObject.$_ = get-variable $_ -valueOnly
+                $dhcpdObject | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                    # Only set if variable is set
+                    if(get-variable $_.name -valueOnly -ErrorAction Ignore){ # Only set object if variable is set. don't override with empty value's
+                        $dhcpdObject.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
                     }
                 }
             }
@@ -526,8 +540,7 @@ Function Write-PFDHCPd{
     }
     process{
         $PFObject = get-pfdhcpd -Server $InputObject
-        $exclude = ("ddnsdomainkeyalgorithm","ddnsdomainprimary","domainsearchlist","filename64","ddnsdomainkey","ddnsdomainkeyname","nextserver","tftp","maxleasetime","ddnsdomain","ldap","failover_peerip","filename","pool","filename32","mac_allow","numberoptions","dhcpleaseinlocaltime","defaultleasetime","ddnsclientupdates","mac_deny","_staticmaps","rootpath","staticmap","StaticHostname","StaticDomain","StaticClientID","StaticMACaddr","StaticIPaddr","StaticDescription","StaticGateway","StaticDNSserver","StaticNTPServer","Staticrootpath","Staticldap","Statictftp","Staticfilename","Staticmaxleasetime","Staticdomainsearchlist","Staticddnsdomainkey","Staticddnsdomainprimary","Staticdefaultleasetime","Staticddnsdomainkeyname","Staticddnsdomain","_StaticHostname","_StaticDomain","_StaticClientID","_StaticMACaddr","_StaticIPaddr","_StaticDescription","_StaticGateway","_StaticDNSserver","_StaticNTPServer","_Staticrootpath","_Staticldap","_Statictftp","_Staticfilename","_Staticmaxleasetime","_Staticdomainsearchlist","_Staticddnsdomainkey","_Staticddnsdomainprimary","_Staticdefaultleasetime","_Staticddnsdomainkeyname","_Staticddnsdomain","staticmaps")
-        $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
+        $PFObject | Format-table enable,Interface,RangeFrom,RangeTo,netmask,Domain,Gateway,DNSServer,NTPServer
     }
 }
 
@@ -581,11 +594,11 @@ Function Add-PFDHCPstaticmap{
     param (
         [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
         [Parameter(Mandatory=$True, HelpMessage='The Hostname you want to add')][String]$Hostname,
-        [Parameter(Mandatory=$True, HelpMessage='The Interface Static Map is going to be created on')] [string]$Interface,
+        [Parameter(Mandatory=$True, HelpMessage='The Interface Static Map is going to be created on')] [string]$Intface,
         [Parameter(Mandatory=$false, HelpMessage='The Domain')] [string]$Domain,
         [Parameter(Mandatory=$True, HelpMessage='The Client ID for this entry, this is mandatory but can be the mac address')] [string]$ClientID,
         [Parameter(Mandatory=$True, HelpMessage='Mac Address of the new entry')] [string]$MACaddr,
-        [Parameter(Mandatory=$True, HelpMessage='IP Address of the new entry')] [string]$Address,
+        [Parameter(Mandatory=$True, HelpMessage='IP Address of the new entry')] [string]$IPaddr,
         [Parameter(Mandatory=$false, HelpMessage='Description')] [string]$Description,
         [Parameter(Mandatory=$false, HelpMessage='Gateway, if non is enterd the gateway of the pool is used')] [string]$Gateway,
         [Parameter(Mandatory=$false, HelpMessage='Gateway, if non is enterd the DNS Server of the pool is used')] [string]$DNSServer,
@@ -593,41 +606,26 @@ Function Add-PFDHCPstaticmap{
     )
     Process{
         $PFObject = get-pfdhcpd -Server $InputObject
-        if($interface -NotIn $PFObject.interface.Description){
-            Throw "Could not find Interface $($interface)"
+        if($Intface -NotIn $PFObject.interface.Description){
+            Throw "Could not find Interface $($Intface)"
         }
-        $Properties = @{
-            Interface = $($InputObject | Get-PFInterface -Description $Interface)
-            Hostname = $Hostname
-            Domain = $Domain
-            ClientID = $ClientID
-            MACaddr = $MACaddr
-            IPaddr = $Address
-            Description = $Description
-            Gateway = $Gateway # This does not have to be a known gateway on the pfsense, no need for: $(if($Gateway){$InputObject | Get-PFGateway -Name $Gateway})
-            DNSServer = $DNSServer
-            NTPServer = $NTPServer
+        $Interface = $($InputObject | Get-PFInterface -Description $Intface)
+        $Properties = @{}
+        $Object = New-Object -TypeName "PFDHCPstaticmap" -Property $Properties
+        $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                $Properties.add($_.name,$(get-variable $_.name -valueOnly -ErrorAction Ignore)) # The -erroraction Ignore is used because not all properties are variable's 
         }
-        $new = New-Object -TypeName "PFDHCPstaticmap" -Property $Properties
+        $NewObject = New-Object -TypeName "PFDHCPstaticmap" -Property $Properties
         foreach($DHCPObject in $PFObject){
-            if($DHCPObject.Interface.Description -eq $new.Interface.Description){
-                # check if the ip addresse is in the interface range
-                [net.IPAddress]$InterfaceAddress = $DHCPObject.interface.IPv4Address
-                $Int64 = ([convert]::ToInt64(('1' * $($DHCPObject.interface.IPv4Subnet) + '0' * (32 - $($DHCPObject.interface.IPv4Subnet))), 2)) 
-                [net.IPAddress]$subnet = '{0}.{1}.{2}.{3}' -f ([math]::Truncate($Int64 / 16777216)).ToString(), ([math]::Truncate(($Int64 % 16777216) / 65536)).ToString(), ([math]::Truncate(($Int64 % 65536)/256)).ToString(), ([math]::Truncate($Int64 % 256)).ToString()
-                [net.IPAddress]$IPaddress = $new.IPaddr
-                if(($InterfaceAddress.Address -band $subnet.address) -ne ($IPaddress.address -band $subnet.address)){
-                    Throw "the Ippaddress $($new.IPaddr) is not in the range of the subnet of the interface $($DHCPObject.interface.IPv4Address)/$($DHCPObject.interface.IPv4Subnet)"
+            if($DHCPObject.Interface.Description -eq $NewObject.Interface.Description){
+                if($New.MACaddr -in $DHCPObject.staticmaps.MACaddr){
+                    Throw "Mac address $($NewObject.MACaddr) is already in use."
                 }
-
-                if($New.MACaddr -in $DHCPObject.staticmaps.MACaddr){ 
-                    Throw "Mac address $($New.MACaddr) is already in use."
-                }
-                elseif($New.ClientID -in $DHCPObject.staticmaps.ClientID){
-                    Throw "ClientID $($New.ClientID) is already in use."
+                elseif($NewObject.ClientID -in $DHCPObject.staticmaps.ClientID){
+                    Throw "ClientID $($NewObject.ClientID) is already in use."
                 }
                 else{
-                $DHCPObject.staticmaps += $New
+                $DHCPObject.staticmaps += $NewObject
                 }
                 Set-PFDHCPd -InputObject $PFserver -NewObject $DHCPObject
             }
@@ -706,22 +704,19 @@ Function Edit-PFDHCPstaticmap{
             if($DHCPObject.Interface.Description -eq $Interface){
                 if($MACaddr -NotIn $DHCPObject.staticmaps.MACaddr){Throw "Could not find Mac address $($Macaddress)"}
                 elseif($ClientID -NotIn $DHCPObject.staticmaps.ClientID){Throw "Could not find ClientID address $($ClientID)"}
-                # check if the ip addresse is in the interface range
-                [net.IPAddress]$InterfaceAddress = $DHCPObject.interface.IPv4Address
-                $Int64 = ([convert]::ToInt64(('1' * $($DHCPObject.interface.IPv4Subnet) + '0' * (32 - $($DHCPObject.interface.IPv4Subnet))), 2)) 
-                [net.IPAddress]$subnet = '{0}.{1}.{2}.{3}' -f ([math]::Truncate($Int64 / 16777216)).ToString(), ([math]::Truncate(($Int64 % 16777216) / 65536)).ToString(), ([math]::Truncate(($Int64 % 65536)/256)).ToString(), ([math]::Truncate($Int64 % 256)).ToString()
-                [net.IPAddress]$IPaddress = $Address
-                if(($InterfaceAddress.Address -band $subnet.address) -ne ($IPaddress.address -band $subnet.address)){
-                    Throw "the Ippaddress $($IPaddress) is not in the range of the subnet of the interface $($InterfaceAddress)/$($DHCPObject.interface.IPv4Subnet)"
-                }
                 $TrowError = $True # we set the throw error on true, if we cannot find the correct combination. the error will be thrown, if we find the combination we set the throw error on false
                 foreach($staticmap in $DHCPObject.staticmaps){
                     if(($staticmap.MACaddr -eq $MACaddr) -and ($staticmap.ClientID -eq $ClientID)){
-                        ("NTPServer","DNSServer","Gateway","Description","IPaddr","Domain","Hostname") | foreach{
-                            if($($_)){
-                                $staticmap.$_ = get-variable $_ -valueOnly
+                        $staticmap | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                            # Only set if variable is set
+                            if(get-variable $_.name -valueOnly -ErrorAction Ignore){ # Only set object if variable is set. don't override with empty value's
+                                if($_.name -eq "Interface"){} #the Interface is not set in the object, but in it's parrent
+                                else{
+                                    $staticmap.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
+                                }
                             }
                         }
+
                         $TrowError = $False
                     }
                 }
@@ -815,8 +810,7 @@ Function Write-PFDHCPstaticmap{
                 }
             }catch{}
         }
-        $exclude = ("rootpath","ldap","tftp","filename","maxleasetime","domainsearchlist","ddnsdomainkey","ddnsdomainprimary","defaultleasetime","ddnsdomainkeyname","ddnsdomain")
-        $Collection | Select-Object -ExcludeProperty $exclude | Format-table * # we display all the object's in the array, but we don't print the Exclude array of property's of the object's
+        $Collection | Format-table Interface,Hostname,Domain,ClientID,MACaddr,IPaddr,Description,Gateway,DNSserver,NTPServer
     }
 }
 
@@ -867,6 +861,9 @@ Function Add-PFFirewall{
     .PARAMETER Description
     The Description of the firewall rule
 
+    .PARAMETER NewLineNumber
+    The New Line Number
+
 
     .EXAMPLE
     ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service Firewall -action add -IsFloating $true -IsQuick $false -IsLogged $false -Type pass -IpProtocol inet -Interface 'WAN manage' -Protocol any -SourceAddress 'Client address' -SourcePort any -DestAddress any -DestPort any -Description 'This is a xmlrpc test' -notls
@@ -889,24 +886,28 @@ Function Add-PFFirewall{
         [Parameter(Mandatory=$false, HelpMessage='Source Port')] [string] $SourcePort,
         [Parameter(Mandatory=$false, HelpMessage='Destination Address')] [string] $DestinationAddress,
         [Parameter(Mandatory=$false, HelpMessage='Destination Port')] [string] $DestinationPort,
-        [Parameter(Mandatory=$false, HelpMessage='The Description of the firewall rule')] [string] $Description
+        [Parameter(Mandatory=$false, HelpMessage='The Description of the firewall rule')] [string] $Description,
+        [Parameter(Mandatory=$false, HelpMessage='The new line number')][Alias('NewLN')][Alias('NewLineNumber')] [string] $lineNumber
     )
     Begin{
-        $created = @{
+        $created = $updated = @{
             Username = $Username
-            time = [string][Math]::Floor((New-TimeSpan -Start $(Get-Date -Date "01/01/1970") -End $(get-date)).TotalSeconds)
-        }
-        $updated = @{
-            Username = $Username
-            time = [string][Math]::Floor((New-TimeSpan -Start $(Get-Date -Date "01/01/1970") -End $(get-date)).TotalSeconds)
+            time = [int](get-date -UFormat "%s")
         }
         $IsDisabled = $False
-        $tracker = [string][Math]::Floor((New-TimeSpan -Start $(Get-Date -Date "01/01/1970") -End $(get-date)).TotalSeconds)
+        $tracker = [int](get-date -UFormat "%s")
     }
     process{
         $PFObject = get-PFFirewall -Server $InputObject
         $InterfaceObject = Get-PFInterface -server $InputObject
         $Alias = Get-PFAlias -server $InputObject
+        # Line number editting
+        if(-not $lineNumber){$lineNumber = ($PFObject | Measure-Object -Property Linenumber -maximum).count} # i use count because this starts at 1 and not at 0 as the array does, so i don't need to add one.
+        if($lineNumber -in $PFObject.linenumber){ # If the linenumber exists we need add one to the original and all up line number to shift them down
+            $PFObject | ForEach-Object {
+                if($_.linenumber -ge $lineNumber){$_.linenumber += 1}
+            }
+        }
         $Properties = @{}
         # if Protocol is any, convert to a blank value
         if($Protocol -eq "Any"){$Protocol = ""}
@@ -931,14 +932,14 @@ Function Add-PFFirewall{
             else{
                 try{  # in the try we try to convert the value to a ipaddress
                     if($_ -match "/"){ # here we see if it is a subnetted address
-                        if(([ipaddress]$_.split("/")[0]) -and $_.split("/")[1] -in 1..128){}
+                        if(([ipaddress]$_.split("/")[0]) -and $_.split("/")[1] -in 1..128){} #ToDo: check if ipv4 32 and ipv6 128
                     }
                     else{ # or a host address
                         if([ipaddress]$_){}
                     }
                 }
                 catch{ # if we cannot convert to a ipaddress or ipnetwork. it must be a alias, if it's no alias, it isn't a valid input so throw a error.
-                    if($_ -NotIn $alias.name){Throw "$($_) isn't a valid input."}
+                    if($_ -cNotIn $alias.name){Throw "$($_) isn't a valid input."}
                 }
             }
         }
@@ -1063,7 +1064,7 @@ Function edit-PFFirewall{
     Begin{
         $updated = @{
             Username = $Username
-            time = [string][Math]::Floor((New-TimeSpan -Start $(Get-Date -Date "01/01/1970") -End $(get-date)).TotalSeconds)
+            time = [int](get-date -UFormat "%s")
         }
     }
     process{
@@ -1109,9 +1110,10 @@ Function edit-PFFirewall{
         foreach($FirewallRule in $PFObject){
             if($FirewallRule.tracker -eq $tracker){
                 # Set al the settings
-                ("IsFloating","IsQuick","IsLogged","Type","IPProtocol","interface","Protocol","SourceAddress","SourcePort","DestinationAddress","DestinationPort","Description","Updated") | foreach {
-                    if($($_)){ #only if the variable excists
-                        $FirewallRule.$_ = get-variable $_ -valueOnly
+                $FirewallRule | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                    # Only set if variable is set
+                    if(get-variable $_.name -valueOnly -ErrorAction Ignore){ # Only set object if variable is set. don't override with empty value's
+                        $FirewallRule.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
                     }
                 }
             }
@@ -1119,6 +1121,56 @@ Function edit-PFFirewall{
         Set-pffirewall -InputObject $InputObject -NewObject $PFObject
     }
 }
+
+function Move-PFFirewall{
+    <#
+    .SYNOPSIS
+    The Move-PFFirewall function move's a firewall rule from the old line number to the new line number. 
+
+    .DESCRIPTION
+    The Move-PFFirewall function move's a firewall rule from the old line number to the new line number. 
+
+    .PARAMETER OldLineNumber
+    The line number you would like to move
+
+    .PARAMETER NewLineNumber
+    the line number you would like to move the line to.
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service Firewall -action move -OldLineNumber 6 -newlinenumber 3 -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+
+    #>
+    [CmdletBinding()]
+    param (
+    [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+    [Parameter(Mandatory=$false, HelpMessage='The old line number')][Alias('OldLN')] [string] $OldLineNumber,
+    [Parameter(Mandatory=$false, HelpMessage='The new line number')][Alias('NewLN')] [string] $NewLineNumber
+    )
+    Process{
+        $PFObject = Get-PFFirewall -Server $InputObject
+        if($NewLineNumber -eq $OldLineNumber){Throw "The Old and New linenumber are equal, no need to move exiting"}
+        if($NewLineNumber -NotIn $PFObject.lineNumber){Throw "The NewLineNumber does not excists on the pfsense"}
+        if($oldLineNumber -NotIn $PFObject.lineNumber){Throw "The OldLineNumber does not excists on the pfsense"}
+        if($NewLineNumber -gt $OldLineNumber){
+            $PFObject | ForEach-Object {
+                if($_.Linenumber -eq $OldLineNumber){$workObject = $_} # save the working object to change it's linenumber after the movement's have been done
+                if(($_.linenumber -le $NewLineNumber) -and ($_.Linenumber -ge $OldLineNumber)){$_.linenumber -= 1}
+            }
+        }
+        if($NewLineNumber -lt $OldLineNumber){
+            $PFObject | ForEach-Object {
+                if($_.Linenumber -eq $OldLineNumber){$workObject = $_}
+                if(($_.linenumber -ge $NewLineNumber) -and ($_.Linenumber -le $OldLineNumber)){$_.linenumber += 1}
+            }
+        }
+        $workObject.linenumber = $NewLineNumber 
+        Set-pffirewall -InputObject $InputObject -NewObject $PFObject
+    }
+}
+
 
 function UpDown-PFFirewall{
     <#
@@ -1181,6 +1233,8 @@ function UpDown-PFFirewall{
    }
 }
 
+
+
 Function Write-PFFirewall{
     <#
     .SYNOPSIS
@@ -1202,18 +1256,53 @@ Function Write-PFFirewall{
     }
     process{
         $PFObject = get-PFFirewall -Server $InputObject
-        $exclude = ("statetype","direction","os","tag","maxsrcstates","icmptype","created","max","updated","tagged","statetimeout","maxsrcnodes","maxsrcconn","Source","Destination","associatedruleid")
-        $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
+        $PFObject | Format-table lineNumber,IsFloating,IsQuick,IsDisabled,IsLogged,Type,IPProtocol,interface,Protocol,SourceAddress,SourcePort,DestinationAddress,DestinationPort,Description,tracker 
     }
 }
 
 Function Add-PFGateway{
+    <#
+   .SYNOPSIS
+   The Add-PFGateway function Add's a Gateway to the PFSense. 
+
+   .DESCRIPTION
+   The Add-PFGateway function Add's a Gateway to the PFSense. 
+   The Name, IpAddress and MonitoringAddress must be unique of each gateway.
+
+   .PARAMETER Name
+   The name of the new gateway
+
+   .PARAMETER IntFace
+   The name of the interface where the gateway live's one. this is te user name.
+
+   .PARAMETER IpProtocol
+   The Ip Protocol that is going to be used (inet, inet6 or inet46)
+
+   .PARAMETER Gateway
+   The exual gateway address
+
+   .PARAMETER Monitor
+   The ip address of the monitoring address of the gateway
+
+   .PARAMETER Weight
+   The weight the gateway has, this can be used for fail over orders.
+
+   .PARAMETER Description
+   The description of the gateway
+
+   .EXAMPLE
+   ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service gateway -action add -name XMLRPC -Interface Manage -Gateway 172.16.20.9 -Weight 1 -Monitor 172.16.20.8 -Protocol inet -Description 'To Test xml rpc add' -notls
+
+   .LINK
+   https://github.com/RaulGrayskull/PFSense_Powershell
+   
+   #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
         [Parameter(Mandatory=$false, HelpMessage='The Name for this entry')] [string] $Name,
-        [Parameter(Mandatory=$True, HelpMessage='The Interface the port forward is going to be created on')] [string]$Interface,
-        [Parameter(Mandatory=$false, HelpMessage='The Ip Protocol, inet or inet6')] [string] $Protocol,
+        [Parameter(Mandatory=$True, HelpMessage='The Interface the port forward is going to be created on')][Alias('Interface')] [string]$Intface,
+        [Parameter(Mandatory=$false, HelpMessage='The Ip Protocol, inet or inet6')][Alias('Protocol')] [string] $IpProtocol,
         [Parameter(Mandatory=$false, HelpMessage='The gateway address')] [string] $Gateway,
         [Parameter(Mandatory=$false, HelpMessage='The Monitoring address')] [string] $Monitor,
         [Parameter(Mandatory=$false, HelpMessage='The weight of the route')] [string] $Weight,
@@ -1222,29 +1311,154 @@ Function Add-PFGateway{
     Begin{
     }
     process{
-        $Properties = @{
-            Name = $name
-            Interface = $($InputObject | Get-PFInterface -Description $Interface)
-            ipProtocol = $Protocol
-            Gateway = $Gateway
-            Monitor = $Monitor
-            Weight = $Weight
-            Description = $Description
+        $PFObject = Get-PFGateway -Server $InputObject
+        # Check User input
+        if($name -in $PFObject.name){Throw "The Gateway name: $($name) is already in use"}
+        if($Gateway -in $PFObject.Gateway){Throw "The Gateway address: $($Gateway) is already in use"}
+        if($Monitor -in $PFObject.Monitor){Throw "The Gateway monitoring address: $($Monitor) is already in use"}
+        # Actual adding
+        $interface = $($InputObject | Get-PFInterface -Description $Intface)
+        $Object = New-Object -TypeName "PFGateway" -Property $Properties
+        $Properties = @{}
+        $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                $Properties.add($_.name,$(get-variable $_.name -valueOnly -ErrorAction Ignore)) # The -erroraction Ignore is used because not all properties are variable's 
         }
-    $new = New-Object -TypeName "PFGateway" -Property $Properties
-    $PFObject = Get-PFGateway -Server $InputObject
-    if($new.name -in $PFObject.name){Throw "The Gateway name: $($new.name) is already in use"}
-    elseif($new.Gateway -in $PFObject.Gateway){Throw "The Gateway address: $($new.Gateway) is already in use"}
-    elseif($new.Monitor -in $PFObject.Monitor){Throw "The Gateway monitoring address: $($new.Monitor) is already in use"}
-    else{
-        $PFObject += $new
-    }
-    Set-PFGateway -InputObject $InputObject -NewObject $PFObject
+        $NewObject = New-Object -TypeName "PFGateway" -Property $Properties
+        $PFObject += $NewObject
+        Set-PFGateway -InputObject $InputObject -NewObject $PFObject
     }
 }
 
 
+Function Delete-PFGateway{
+    <#
+   .SYNOPSIS
+   The Delete-PFGateway function deletes a Gateway to the PFSense. 
+
+   .DESCRIPTION
+   The Delete-PFGateway function deletes a Gateway to the PFSense. 
+   The Name of the gateway is used to identifie it and delete it from the pfsense
+
+   .PARAMETER Name
+   The name of the new gateway
+
+   .EXAMPLE
+   ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service gateway -action Delete -name extra_gateway -notls
+
+   .LINK
+   https://github.com/RaulGrayskull/PFSense_Powershell
+   
+   #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$false, HelpMessage='The Name for this entry')] [string] $Name
+        )
+    Begin{
+    }
+    process{
+        $PFObject = Get-PFGateway -Server $InputObject
+        # Check User input
+        if($name -NotIn $PFObject.name){Throw "The Gateway name: $($name). Cannot be found"}
+        # Delete the PFobject that has the name in the $name variable
+        $PFObject = ($PFObject | Where-Object {$_.name -ne $name})
+        Set-PFGateway -InputObject $InputObject -NewObject $PFObject
+    }
+}
+
+
+Function Edit-PFGateway{
+    <#
+   .SYNOPSIS
+   The Edit-PFGateway function edit's a Gateway to the PFSense. 
+
+   .DESCRIPTION
+   The Edit-PFGateway function edit's a Gateway to the PFSense. 
+   The Unique Identifier is the name, the ipaddress and monitoring address must also be unique on the pfsense
+
+   .PARAMETER Name
+   The name of the gateway
+
+   .PARAMETER IntFace
+   The name of the interface where the gateway live's one. this is te user name.
+
+   .PARAMETER IpProtocol
+   The Ip Protocol that is going to be used (inet, inet6 or inet46)
+
+   .PARAMETER Gateway
+   The exual gateway address
+
+   .PARAMETER Monitor
+   The ip address of the monitoring address of the gateway
+
+   .PARAMETER Weight
+   The weight the gateway has, this can be used for fail over orders.
+
+   .PARAMETER Description
+   The description of the gateway
+
+   .EXAMPLE
+   ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service gateway -action edit -name extra_gateway -Interface Manage -Gateway 192.168.38.19 -Weight 1 -Monitor 192.168.38.19 -Protocol inet -Description 'this is a extra gateway' -notls
+
+   .LINK
+   https://github.com/RaulGrayskull/PFSense_Powershell
+   
+   #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$True, HelpMessage='The Name for this entry')] [string] $Name,
+        [Parameter(Mandatory=$True, HelpMessage='The Interface the port forward is going to be created on')][Alias('Interface')] [string]$Intface,
+        [Parameter(Mandatory=$false, HelpMessage='The Ip Protocol, inet or inet6')][Alias('Protocol')] [string] $IpProtocol,
+        [Parameter(Mandatory=$false, HelpMessage='The gateway address')] [string] $Gateway,
+        [Parameter(Mandatory=$false, HelpMessage='The Monitoring address')] [string] $Monitor,
+        [Parameter(Mandatory=$false, HelpMessage='The weight of the route')] [string] $Weight,
+        [Parameter(Mandatory=$false, HelpMessage='The description of the route')] [string] $Description
+        )
+    Begin{
+    }
+    process{
+        $PFObject = Get-PFGateway -Server $InputObject
+        # Check User input
+        if($name -NotIn $PFObject.name){Throw "The Gateway name: $($name). Cannot be found"}
+        # The Gateway and monitoring do not have to change, so we need all the gateway and monitoring address, except the one we are editting to check for duplicte's
+        $PFObjectCheck = ($PFObject | Where-Object {$_.name -ne $name})
+        if($Gateway -in $PFObjectCheck.Gateway){Throw "The Gateway address: $($Gateway) is already in use"}
+        if($Monitor -in $PFObjectCheck.Monitor){Throw "The Gateway monitoring address: $($Monitor) is already in use"}
+        # Actual adding
+        $interface = $($InputObject | Get-PFInterface -Description $Intface)
+        foreach($GatewayObject in $PFObject){
+            if($GatewayObject.name -eq $name){
+                $GatewayObject | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                    # Only set if variable is set
+                    if(get-variable $_.name -valueOnly -ErrorAction Ignore){ # Only set object if variable is set. don't override with empty value's
+                        $GatewayObject.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
+                    }
+                }
+            }
+
+        }
+        Set-PFGateway -InputObject $InputObject -NewObject $PFObject
+    }
+}
+
+
+
 Function Write-PFGateway{
+    <#
+   .SYNOPSIS
+   The Write-PFGateway function Display's all the Gateway's of the pfsense
+
+   .DESCRIPTION
+   The Write-PFGateway function Display's all the Gateway's of the pfsense
+
+   .EXAMPLE
+   ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service gateway -action print -notls
+
+   .LINK
+   https://github.com/RaulGrayskull/PFSense_Powershell
+   
+   #>
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
     Begin{
@@ -1258,7 +1472,7 @@ Function Write-PFGateway{
                 $Collection.Add($Rule) | out-null
             }
         }
-        $Collection | Select-Object -ExcludeProperty $exclude | Format-table *
+        $Collection | Format-table Name,Interface,Gateway,Monitor,Weight,IPProtocol,Description
     }
 }
 
@@ -1277,7 +1491,7 @@ Function Write-PFInterface{
                 $Collection.Add($Rule) | out-null
             }
         }
-        $Collection | format-table *
+        $Collection | format-table Enable,Name,Description,Interface,IPv4Address,IPv4Subnet,IPv4Gateway,IPv6Address,IPv6Subnet,IPv6Gateway,blockpriv,BlockBogons,Media
     }
 }
 
@@ -1298,7 +1512,7 @@ Function Add-PFNatRule{
     Begin{
         $Updated = @{
             Username = $Username
-            time = [string][Math]::Floor((New-TimeSpan -Start $(Get-Date -Date "01/01/1970") -End $(get-date)).TotalSeconds)
+            time = [int](get-date -UFormat "%s")
         }
     }
     process{
@@ -1602,7 +1816,7 @@ try{
     if(-not $Flow.ContainsKey($Service)){  Write-Host "Unknown service '$Service'" -ForegroundColor red; exit 2 }
     if(-not $Flow.$Service.ContainsKey($Action)){ Write-Host "Unknown action '$Action' for service '$Service'" -ForegroundColor red; exit 3 }
 
-    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer,$path,$file,$Network,$Gateway,$Description,$Interface,$From,$To,$netmask,$Domain,$DNSServer,$NTPServer,$Alias,$Type,$Address,$Detail,$HostName,$ClientID,$MacAddr,$Protocol,$SourceAddress,$DestAddress,$DestPort,$NatIp,$NatPort,$Weight,$Monitor,$Name,$IpProtocol,$IsLogged,$IsQuick,$IsFloating,$tracker
+    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer,$path,$file,$Network,$Gateway,$Description,$Interface,$From,$To,$netmask,$Domain,$DNSServer,$NTPServer,$Alias,$Type,$Address,$Detail,$HostName,$ClientID,$MacAddr,$Protocol,$SourceAddress,$DestAddress,$DestPort,$NatIp,$NatPort,$Weight,$Monitor,$Name,$IpProtocol,$IsLogged,$IsQuick,$IsFloating,$tracker,$OldLineNumber,$NewLineNumber
  
 } catch { 
     Write-Error $_.Exception.Message

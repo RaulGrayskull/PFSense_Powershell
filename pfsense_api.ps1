@@ -78,7 +78,8 @@ function ConvertTo-PFObject{
     param (
         [Parameter(Mandatory=$true, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)][PFServer]$InputObject,
         [Parameter(Mandatory=$true)]$PFObjectType,
-        [Parameter(Mandatory=$False)]$SectionOverride
+        [Parameter(Mandatory=$False)]$SectionOverride,
+        [Parameter(Mandatory=$False)][switch]$ArrayOverride
     )
 
     begin{
@@ -105,6 +106,11 @@ function ConvertTo-PFObject{
             $ObjectToParse = $ObjectToParse.$XMLPFObj
         }
         if(-not $ObjectToParse){ return }
+
+        # if arrayOverride is set, The Object must be in an array and cannot be a single hashtable.
+        if(($ArrayOverride) -and ($ObjectToParse.gettype() -eq [hashtable])){
+            [array]$ObjectToParse = @($ObjectToParse)
+        }
 
         # To enable a single and structured approach, we need to make the hashtable key (often the Name property, but not always) 
         # available in the value (value always is a hashtable). This makes sure we can use one iterable function to iterate over all objects. 
@@ -179,10 +185,14 @@ function ConvertTo-PFObject{
                 #       known issue: PFAlias property Detail is split on space, which should not happen. BUT, properties Address/Detail need to be in their own object anyway
                 # If the property is (should be) a collection but contains only one item, we might need to split them.
                 if($PropertyIsCollection -and ($PropertyValues.Count -eq 1)){ 
-                    $PropertyValue = $PropertyValues | Select-Object -First 1
-                    if(-not $PFTypeDelimeterMapping.$PFTypeProperty){}
-                    elseif($Null -eq $PFTypeDelimeterMapping.$PFTypeProperty){$PFTypeDelimeterMapping.$PFTypeProperty = ","}
-                    $PropertyValues = $PropertyValue.split($PFTypeDelimeterMapping.$PFTypeProperty)
+                    # it sometimes so happens tat we want to have an array, but the XML-RPC api will return a comma delimited string (or another delimiter).
+                    # this routine is meant to populate an array from a non-collection, like string, by splitting it on a defined delimiter.
+                    $PropertyValue = ($PropertyValues | Select-Object -First 1)
+
+                    if("split" -in $PropertyValue.PSobject.Methods.name){ # this is a bit more flexible than static typecheking on the "string" object.
+                        $SplitDelimiter = ($PFTypeDelimeterMapping.$PFTypeProperty ? $PFTypeDelimeterMapping.$PFTypeProperty : ",")
+                        $PropertyValues = $PropertyValue.split($SplitDelimiter)
+                    }
                 }   
 
                 $PropertyTypedValues = New-Object System.Collections.ArrayList
@@ -259,8 +269,7 @@ function ConvertFrom-PFObject{
                 if($XMLProperty -match "/"){
                     [hashtable]$PropertyTypedValue = @{}
                     $PropertyTypedValue.add($($XMLProperty.Split("/"))[-1],$PropertyTypedValueConverted)
-
-#                    [array]$PropertyTypedValueArray = $PropertyTypedValue
+                    
                     if($PFHashValueEntry.$($($XMLProperty.Split("/"))[-2])){$PFHashValueEntry.$($($XMLProperty.Split("/"))[-2]) = $PFHashValueEntry.$($($XMLProperty.Split("/"))[-2]) + $PropertyTypedValue}# $PropertyTypedValueArray}
                     else{$PFHashValueEntry.add($($XMLProperty.Split("/"))[-2],$PropertyTypedValue)}
                 }
@@ -278,6 +287,7 @@ function ConvertFrom-PFObject{
                 $PFTypePropertyMapping.GetEnumerator() | foreach {
                     if($_.value -eq "_key"){
                         $PFHashTableName = $PFObjectEntry.$($_.name).name
+                        if(-not $PFHashTableName){$PFHashTableName = $PFObjectEntry.$($_.name)} #this is used for the PFInterface
                         $PFHashValue.add($PFHashTableName,$PFHashValueEntry)
                     }
                 }
@@ -461,6 +471,9 @@ function Get-PFInterface {
 
     .PARAMETER Name
         Optional parameter to filter by interface name. 
+
+    .PARAMETER Description
+        Optional parameter to filter by interface Description.
     #>
     [CmdletBinding()]
     [OutputType([PFInterface[]])]
@@ -480,9 +493,6 @@ function Get-PFInterface {
         $InterfacesFromConfig = $InputObject |  ConvertTo-PFObject -PFObjectType "PFInterface"
         $InterfacesFromConfig | ForEach-Object { $Interfaces.Add($_) | Out-Null }
         
-        # Invert the Enable Bool, if the interface is enabled it has a enable with no value, if the interface is disabled it has no enbale field in the xml field. The default value in de class is $true, if no enable field is found it stay's true and thus disabled
-        $Interfaces | ForEach-Object {$_.Enable = -not $_.Enable}
-
         # add the IPv6 LinkLocal name and description so these can be translated
         $InterfacesFromConfig.GetEnumerator() | ForEach-Object {
             $Properties = @{
@@ -525,6 +535,23 @@ function Get-PFInterface {
         }
     }
 }
+
+function Set-PFInterface {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
+        [Parameter(Mandatory=$true)][psobject]$NewObject)
+    process{
+    # Remove the IPv6 LinkLocal name and description. These are only used in the script's not in the xml-rpc
+    $NoIpv6Linklocalname = $NewObject | Where-Object {-not ($_.name).startswith("_lloc")}
+    # Remove implicitly defined interfaces 
+    $ImplicitlyDefinedInterfaces = @('All','lo0','(self)')
+    $UploadObjects = $NoIpv6Linklocalname | Where-Object {-not ($_.name -In $ImplicitlyDefinedInterfaces)}
+    # Now that the XML-RPC Objects are the only one's left, send them to the ConvertFrom-PFObject
+    ConvertFrom-PFObject -InputObject $InputObject -PFObject $UploadObjects -PFObjectType "PFInterface"
+    }
+}
+
 function Get-PFAlias {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
@@ -590,7 +617,13 @@ function Set-PFAlias {
     }    
 }
 
-
+function Get-PFCert {
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
+    process {
+        $InputObject | ConvertTo-PFObject -PFObjectType  "PFcert"# -ArrayOverride
+    }
+}
 
 
 function Get-PFDHCPd {
@@ -600,7 +633,7 @@ function Get-PFDHCPd {
         $DHCPD = $InputObject | ConvertTo-PFObject -PFObjectType "PFDHCPd"
         foreach($Entry in $DHCPD){
             $SectionOverride = "dhcpd/{0}/staticmap" -f $Entry.Interface.name
-            $DHCPStaticmap = $InputObject | ConvertTo-PFObject -PFObjectType "PFdhcpStaticMap" -SectionOverride $SectionOverride
+            $DHCPStaticmap = $InputObject | ConvertTo-PFObject -PFObjectType "PFdhcpStaticMap" -SectionOverride $SectionOverride -ArrayOverride
             $Entry.staticmaps = $DHCPStaticmap
         }
         return $DHCPD
@@ -623,7 +656,7 @@ function Set-PFDHCPd {
         foreach($Object in $NewObject){
             if($Object.enable){ # Only do check's if pool in enabled. else value's can be empty
                 # Check if the from address is smaller then the to address
-                if((IpToNumber -ipaddress $Object.RangeFrom) -gt (IpToNumber -ipaddress $Object.RangeTo)){throw "The pool to address must be greather then the pool start address"}
+                if($Object.RangeFrom -gt $Object.RangeTo){throw "The pool to address must be greather then the pool start address"}
                 # check if the pool addresses are in the interface range
                 if($(IpBand -Ipaddress $Object.interface.IPv4Address -Subnet $Object.interface.IPv4Subnet) -ne $(IpBand -Ipaddress $Object.RangeFrom -Subnet $Object.interface.IPv4Subnet)){Throw "the pool range is not in the same subnet as the interface"}
                 if((IpBand -Ipaddress $Object.interface.IPv4Address -Subnet $Object.interface.IPv4Subnet) -ne (IpBand -Ipaddress $Object.RangeTo -Subnet $Object.interface.IPv4Subnet)){Throw "the pool range is not in the same subnet as the interface"}
@@ -652,6 +685,16 @@ function Set-PFDHCPd {
         ConvertFrom-PFObject -InputObject $InputObject -PFObject $UploadObjects -PFObjectType "PFDHCPd"
     }
 }
+
+
+function Get-PFDnsMasq {
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
+    process {
+        $InputObject | ConvertTo-PFObject -PFObjectType  "PFDnsMasq" -ArrayOverride
+    }    
+}
+
 
 function Set-PFFirewall {
     [CmdletBinding()]
@@ -704,11 +747,8 @@ function Get-PFFirewall {
     process {
         $Rules = ConvertTo-PFObject -PFObjectType "PFFirewall" -InputObject $InputObject
         [int]$LineNumber = 0
-        while($rules[$LineNumber]){
-            $rules[$LineNumber].LineNumber = $LineNumber
-            $LineNumber ++
-        }
         foreach($Rule in $Rules){
+            $Rule.LineNumber = $LineNumber ++
             ("Source","Destination") | foreach {
                 $Rule.$($_+"Port") = ($Rule.$_.Port) ? $Rule.$_.Port.InnerText : "any"
 
@@ -899,27 +939,138 @@ function Get-PFUnbound {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
     process {
-        $InputObject | ConvertTo-PFObject -PFObjectType  "PFUnbound"
+        $InputObject | ConvertTo-PFObject -PFObjectType  "PFUnbound" -ArrayOverride
     }
 }
 
+function Set-PFUnbound {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
+        [Parameter(Mandatory=$true)][psobject]$NewObject)
+    process{
+        ConvertFrom-PFObject -InputObject $InputObject -PFObject $NewObject -PFObjectType "PFUnbound"
+    }    
+}
 
 function Get-PFunboundHost {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
     process { 
-        $InputObject | ConvertTo-PFObject -PFObjectType "PFunboundHost"
+        $PFunboundHost = $InputObject | ConvertTo-PFObject -PFObjectType "PFunboundHost" -arrayoverride
+        foreach($PFhost in $PFunboundHost){
+            ("_AliasesHost","_AliasesDomain","_AliasesDescription") | foreach{
+                if($PFhost.$_ -eq "System.Xml.XmlElement Item(string name) {get;}, System.Xml.XmlElement Item(string localname, string ns) {get;}"){$PFhost.$_ = ""}
+            }
+            $index = 0
+            $Properties = @{}
+            $Object = New-Object -TypeName "PFUnboundHostEntry" -Property $Properties
+            while($PFhost._AliasesHost[$Index]){
+                $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
+                    $Property = $_.Name
+                    try {$PropertyValue = $PFhost.$Property[$index]}
+                    catch{$PropertyValue = $PFhost.$Property}
+                    $Properties.$Property = $PropertyValue
+                }
+                $NewObject = New-Object -TypeName "PFUnboundHostEntry" -Property $Properties
+                $PFhost.Alias += $NewObject
+                $Index++
+            }
+        }
+        return $PFunboundHost
     }
+}
+
+function Get-PFunboundDomain {
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
+    process { 
+        $PFunboundDomain = $InputObject | ConvertTo-PFObject -PFObjectType "PFunboundDomain" -arrayoverride
+        return $PFunboundDomain
+    }
+}
+
+function Set-PFunboundDomain {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
+        [Parameter(Mandatory=$true)][psobject]$NewObject)
+        begin{
+            $UploadArray = @()
+        }
+        process{
+            foreach($object in $NewObject){
+                $UploadHashtable = @{}
+                $object | Get-Member -MemberType properties | foreach {
+                    $UploadHashtable[$_.name] = $object.($_.name)
+                }
+                $UploadArray += $UploadHashtable
+            }
+
+        $PFUnbound = Get-PFUnbound -InputObject $InputObject
+        $PFUnbound.domainoverrides = $UploadArray
+        ConvertFrom-PFObject -InputObject $InputObject -PFObject $PFUnbound -PFObjectType "PFunbound"
+    }    
+}
+
+function Set-PFunboundHost {
+    <#
+    This set function works just a little differend, here we already set the aliasses before we send it to the ConvertFrom-PFObject.
+    This is done because that part of the script does not yet can handel the dubble / in the staticmapping.
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
+        [Parameter(Mandatory=$true)][psobject]$NewObject)
+    begin{
+        $UploadArray = @()
+    }
+    process{
+        foreach($object in $NewObject){
+            $Object.Aliases = @{}
+            $ItemArray = @()
+            foreach($entry in $object.Alias){
+                $Item = @{
+                    host = $entry._AliasesHost
+                    domain = $entry._AliasesDomain
+                    description = $entry._AliasesDescription
+                }
+                $ItemArray += $item
+            }
+            if($ItemArray -ne 0){$Object.Aliases.add("Item",$itemArray)} # if there are aliases items add them
+            else{$Object.Aliases = ""} # else keep the aliases only with a string
+            $WorkObject = $($Object | Select-Object -Property * -ExcludeProperty "Alias","_AliasesHost","_AliasesDomain","_AliasesDescription")
+
+            $UploadHashtable = @{}
+            $WorkObject | Get-Member -MemberType properties | foreach {
+                $UploadHashtable[$_.name] = $WorkObject.($_.name)
+            }
+            $UploadArray += $UploadHashtable
+        }
+        # Now we need to get all the other unbound setting and set the host part. this has to be done to keep all the dns settings.
+        $PFUnbound = Get-PFUnbound -InputObject $InputObject
+        $PFUnbound.hosts = $UploadArray
+        ConvertFrom-PFObject -InputObject $InputObject -PFObject $PFUnbound -PFObjectType "PFunbound"
+    }    
 }
 
 function Get-PFVlan {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][PFServer]$InputObject)
     process {
-        $InputObject | ConvertTo-PFObject -PFObjectType "PFVlan"
+        $InputObject | ConvertTo-PFObject -PFObjectType "PFVlan" -ArrayOverride
     }
 }
 
+function Set-PFVlan {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
+        [Parameter(Mandatory=$true)][psobject]$NewObject)
+    process{
+        ConvertFrom-PFObject -InputObject $InputObject -PFObject $NewObject -PFObjectType "PFVlan"
+    }    
+}
 
 function Invoke-PFXMLRPCRequest {
     <#
@@ -1076,19 +1227,6 @@ function TestPFCredential {
 
         return $true
     }    
-}
-
-function IpToNumber{
-    param ([Parameter(Mandatory=$True, HelpMessage='ipaddress')]$Ipaddress)
-    process{
-        [Ipaddress]$Ipaddress = $Ipaddress
-        [int64]$multiply = 1
-        [array]$IPArray = $Ipaddress.GetAddressBytes()
-        [int64]$IpNumber = 0
-        [array]::Reverse($IPArray)
-        foreach($octed in $IPArray){$ipNumber += $octed*$multiply;$multiply *=  256}
-        return $ipNumber
-    }
 }
 
 Function IpBand{

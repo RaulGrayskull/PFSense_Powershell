@@ -28,6 +28,24 @@ class PFAliasEntry {
     }
 }
 
+class PFCert {
+    [string]$ReferenceID
+    [string]$Description
+    [string]$Private
+    [string]$crt
+    [string]$Cert
+
+    static [string]$Section = "cert"
+    # property name as it appears in the XML, insofar it's different from the object's property name
+    static $PropertyMapping = @{
+        ReferenceID = "refid"
+        Description = "descr"
+        Private = "prv"
+        Cert = "crt"
+    }
+}
+
+
 class PFDHCPd{
     [Bool]$enable
     [PFInterface]$Interface
@@ -110,6 +128,33 @@ class PFdhcpStaticMap{
         Description = "desc"
     }
 }
+
+class PFDnsMasq{
+    [string]$Port
+    [bool]$DHCPReg
+    [bool]$Enable
+    [bool]$Dhcpfirst
+    [bool]$StrictOrder
+    [bool]$DomainNeeded
+    [bool]$NoPrivateReverse
+    [string]$CustomOptions
+    [PFInterface[]]$Interface
+    [hashtable[]]$Hosts
+    [hashtable[]]$domainoverrides
+    [bool]$Strictbind
+    [bool]$DHCPRegstatic
+
+    static [string]$Section = "dnsmasq"
+    # property name as it appears in the XML, insofar it's different from the object's property name
+    static $PropertyMapping = @{
+        StrictOrder = "strict_order"
+        DomainNeeded = "domain_needed"
+        NoPrivateReverse = "no_private_reverse"
+        CustomOptions = "custom_options"
+        DHCPRegstatic = "Regdhcpstatic"
+    }
+}
+
 
 class PFFirewall {
     [int]$lineNumber
@@ -211,7 +256,7 @@ class PFGateway {
 }
 
 class PFInterface {
-    [bool]$Enable = $True
+    [bool]$Enable = $False
     [ValidateNotNullOrEmpty()][string]$Name
     [string]$Description
     [string]$Interface
@@ -231,8 +276,26 @@ class PFInterface {
     [string]$MediaOpt
     [string]$DHCPv6DUID
     [string]$DHCPv6IAPDLEN
-    
-    
+    [string]$dhcphostname
+    [string]$dhcprejectfrom
+    [string]$AliasAddress
+    [string]$AliasSubnet
+    [string]$AdvDhcpPtTimeout
+    [string]$AdvDhcpPtRetry
+    [string]$AdvDhcpPtSelectTimeout
+    [string]$AdvDhcpPtReboot
+    [string]$AdvDhcpPtBackoffCutoff
+    [string]$AdvDhcpPtInitialInterval
+    [string]$AdvDhcpPtValues
+    [string]$AdvDhcpSendOptions
+    [string]$AdvDhcpRequestOptions
+    [string]$AdvDhcpRequiredOptions
+    [string]$AdvDhcpOptionModifiers
+    [string]$AdvDhcpConfigAdvanced
+    [string]$AdvDhcpConfigFileOverride
+    [string]$AdvDhcpConfigFileOverride_path
+    [string]$AdvDhcp6PrefixSelectedInterface
+
 
     static [string]$Section = "interfaces"
     # property name as it appears in the XML, insofar it's different from the object's property name
@@ -250,6 +313,23 @@ class PFInterface {
         Trackv6PrefixId = "track6-prefix-id"
         DHCPv6DUID = "dhcp6-duid"
         DHCPv6IAPDLEN = "dhcp6-ia-pd-len"
+        aliasaddress = "alias-address"
+        AliasSubnet = "alias-subnet"
+        AdvDhcpPtTimeout = "adv_dhcp_pt_timeout"
+        AdvDhcpPtRetry = "adv_dhcp_pt_retry"
+        AdvDhcpPtSelectTimeout = "adv_dhcp_pt_select_timeout"
+        AdvDhcpPtReboot = "adv_dhcp_pt_reboot"
+        AdvDhcpPtBackoffCutoff = "adv_dhcp_pt_backoff_cutoff"
+        AdvDhcpPtInitialInterval = ""
+        AdvDhcpPtValues = "adv_dhcp_pt_initial_interval"
+        AdvDhcpSendOptions = "adv_dhcp_pt_values"
+        AdvDhcpRequestOptions = "adv_dhcp_send_options"
+        AdvDhcpRequiredOptions = "adv_dhcp_request_options"
+        AdvDhcpOptionModifiers = "adv_dhcp_option_modifiers"
+        AdvDhcpConfigAdvanced = "adv_dhcp_config_advanced"
+        AdvDhcpConfigFileOverride = "adv_dhcp_config_file_override"
+        AdvDhcpConfigFileOverride_path = "adv_dhcp_config_file_override_path"
+        AdvDhcp6PrefixSelectedInterface = "adv_dhcp6_prefix_selected_interface"
     }
 
     [string] ToString(){
@@ -316,39 +396,81 @@ class PFStaticRoute {
 }
 
 class PFUnbound {
-    [string]$ActiveInterface
-    [string]$OutgoingInterface
+    [PFInterface[]]$ActiveInterface
+    [PFInterface[]]$OutgoingInterface
     [bool]$dnssec
     [bool]$enable
     [int]$port
     [int]$sslport
+    [string]$CustomOptions
+    [string]$hideidentity
+    [string]$hideversion
+    [string]$dnssecstripped
+    [string]$sslcertref
+    [string]$SystemDomainLocalZoneType
+    [hashtable[]]$hosts
+    [hashtable[]]$domainoverrides
+
 
     static [string]$Section = "unbound"
     static $PropertyMapping = @{
+        CustomOptions = "custom_options"
+        SystemDomainLocalZoneType = "system_domain_local_zone_type"
         ActiveInterface = "active_interface"
         OutgoingInterface = "outgoing_interface"
     }
 }
 
+class PFUnboundHostEntry {
+    [string]$_AliasesHost
+    [string]$_AliasesDomain
+    [String]$_AliasesDescription
+
+    [string] ToString(){
+        return ("{0}.{1}: Description= {2}" -f $this._AliasesHost,$this._AliasesDomain,$this._AliasesDescription)
+    }
+}
+
+
 class PFUnboundHost {
     [string]$Hostname
     [string]$Domain
-    [string]$IPaddr
-    [string]$AliasesHost
-    [string]$AliasesDomain
-    [string]$AliasesDescription
+    [string]$Address
+    [string]$Description
+    [string[]]$_AliasesHost
+    [string[]]$_AliasesDomain
+    [string[]]$_AliasesDescription
+    [PFUnboundHostEntry[]]$Alias
+    $aliases # If aliases is set to [hashtable[]] and it is empty, it crashes the script
 
     static [string]$Section = "unbound/hosts"
     static $PropertyMapping = @{ 
         Hostname = "host"
         Domain = "Domain"
-        IPaddr = "IP"
-        aliasesHost = "aliases/item/host"
-        AliasesDomain = "aliases/item/domain"
-        AliasesDescription = "aliases/item/Description"
+        Address = "IP"
+        Description = "descr"
+        _AliasesHost = "aliases/item/host"
+        _AliasesDomain = "aliases/item/domain"
+        _AliasesDescription = "aliases/item/Description"
     }
 }
 
+
+class PFUnboundDomain {
+    [string]$Domain
+    [string]$Address
+    [string]$Description
+    [string]$TlsHostname
+    [bool]$TLSQueries
+
+    static [string]$Section = "unbound/domainoverrides"
+    static $PropertyMapping = @{ 
+        Address = "IP"
+        Description = "descr"
+        TlsHostname = "tls_hostname"
+        TLSQueries = "forward_tls_upstream"
+    }
+}
 
 class PFVlan {
     [string]$interface

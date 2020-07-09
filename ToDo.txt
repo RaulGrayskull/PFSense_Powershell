@@ -2,43 +2,60 @@ Alias:
 Done
 
 Dhcpd:
-If a dhcpd has only one staticmap on a interface it crashes the script: 
-    Write-Error: Method invocation failed because [System.Collections.Hashtable] does not contain a method named 'Split'.
 Add is done by the interface, if we set that to a fixed IPaddress, it is added to the dhcpd, if we set it to dhcp it is deleted from the dhcpd
 
 DhcpStaticMap:
-Done
+Done.
+
+DNSForwarder:
+Print :
+Edit :
+
+DNSForwarderHost:
+Print : 
+Edit : 
+Add : 
+Delete : 
 
 DnsResolver:
-crashes on pfsense_api line 121 at hosts: Cannot find an overload for "Add" and the argument count: "2"
+Done.
+We cannot add or delete because this are the default settings of the deamon
 
 DnsResolverHost:
-crashes (AliasesDescription = "aliases/item/Description" still has a xmlelement)
-It looks to happen if a host has no aliases
+Done.
+
+DnsResolverDomain:
+Done.
 
 Firewall:
 Done.
 
-
 Gateway:
-Print: Done
-Add: Done
-Edit: Done
-    Unique is:  -Name
-                -IP
-                -monitor
-Delete: Done
+Done.
+
+Interface:
+For now we can only edit interfaces, the add and delete may be possible on vlan interfaces. but this has to be tested
+Done
 
 Portfwd:
-Print: Done
-Add: look for duplicate and give error message, there can be duplicate's in the webbrowser
-Delete: Done
+Done.
 Edit: There is no Unique identifier. so edit is as hard to select and edit.
 
 StaticRoute:
-Split add & edit
+Done.
 
 Vlan's:
-Empty.
+print: Done
+Add: Done
+Delete: Done
 
-Interface:
+Cert's:
+print: Look if possible to extract more info from base64 crt
+
+
+
+
+
+
+Think about:
+Set-pfunbound, could be joined with Set-pfunboundHosts and Set-pfunboundDomain

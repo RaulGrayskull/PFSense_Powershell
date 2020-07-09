@@ -41,6 +41,28 @@ Param
     [Parameter(Mandatory=$false, HelpMessage='The Tracker id of the firewall rule you would like to edit')] [string] $tracker,
     [Parameter(Mandatory=$false, HelpMessage='The old line number')][Alias('OldLN')] [string] $OldLineNumber,
     [Parameter(Mandatory=$false, HelpMessage='The new line number')][Alias('NewLN')] [string] $NewLineNumber,
+    [Parameter(Mandatory=$false, HelpMessage='IPv4 Address')][Alias('IPv4A')] [string] $IPv4Address,
+    [Parameter(Mandatory=$false, HelpMessage='IPv4 Subnet')][Alias('IPv4S')] [string] $IPv4Subnet,
+    [Parameter(Mandatory=$false, HelpMessage='IPv4 Gateway')][Alias('IPv4G')] [string] $IPv4Gateway,
+    [Parameter(Mandatory=$false, HelpMessage='IPv6 Address')][Alias('IPv6A')] [string] $IPv6Address,
+    [Parameter(Mandatory=$false, HelpMessage='IPv6 Subnet')][Alias('IPv6S')] [string] $IPv6Subnet,
+    [Parameter(Mandatory=$false, HelpMessage='IPv6 Gateway')][Alias('IPv6')] [string] $IPv6Gateway,
+    [Parameter(Mandatory=$false, HelpMessage='Block private networks and loopback addresses')][string] $blockpriv,
+    [Parameter(Mandatory=$false, HelpMessage='Block bogon networks')][string] $BlockBogons,
+    [Parameter(Mandatory=$false, HelpMessage='The Active interfaces')][Alias('ActiveInterface')][string] $ActiveInt,
+    [Parameter(Mandatory=$false, HelpMessage='The Outgoint Interfaces')][string] $OutgoingInterface,
+    [Parameter(Mandatory=$false, HelpMessage='DNS Sec enable or disable')][bool] $dnssec,
+    [Parameter(Mandatory=$false, HelpMessage='The port you would like to use')][string] $port,
+    [Parameter(Mandatory=$false, HelpMessage='The SSL port')][string] $sslport,
+    [Parameter(Mandatory=$false, HelpMessage='Costum Options')][string] $CustomOptions,
+    [Parameter(Mandatory=$false, HelpMessage='SSL cert Ref of a ssl certificate known by the PFsense')][string] $sslcertref,
+    [Parameter(Mandatory=$False, HelpMessage='Hostname of the Alias')] [string] $HostNameAlias,
+    [Parameter(Mandatory=$False, HelpMessage='The Domain of the Alias')] [string] $DomainAlias,
+    [Parameter(Mandatory=$false, HelpMessage='The Description of the Alias')] [string] $DescriptionAlias,
+    [Parameter(Mandatory=$false, HelpMessage='When set, queries to all DNS servers for this domain will be sent using SSL/TLS on the default port of 853.')] [Bool] $TLSQueries,
+    [Parameter(Mandatory=$false, HelpMessage='An optional TLS hostname used to verify the server certificate when performing TLS Queries.')] [string] $TlsHostname,
+    [Parameter(Mandatory=$false, HelpMessage='802.1Q VLAN tag (between 1 and 4094).')][int]$Tag,
+    [Parameter(Mandatory=$false, HelpMessage='802.1Q VLAN Priority (between 0 and 7).')][int]$Priority,
     [Switch] $NoTLS,
     [switch] $SkipCertificateCheck
     )
@@ -69,7 +91,7 @@ Function Add-PFAlias{
     it also check's if the alias name does not excists yet, the name is a unique id.
 
     .PARAMETER Alias
-    The Name of the Alias
+    The name of the alias may only consist of the characters "a-z, A-Z, 0-9 and _"
 
     .PARAMETER Type
     The Type of the alias, could be Host, Network or Port
@@ -81,7 +103,7 @@ Function Add-PFAlias{
     The description of the address value
 
     .PARAMETER Description
-    The description of the Alias
+    A description may be entered here for administrative reference (not parsed).
     
     .EXAMPLE
     ./pfsense.ps1' -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service alias -action add -Alias UploadTest -Type Host -address 192.168.0.5 -Detail 'To test XMLRPC' -Description 'Test the upload of a alias' -notls
@@ -132,7 +154,7 @@ Function Edit-PFAlias{
     If the Address and Detail are enterd these will overwrite the excisting one's
 
     .PARAMETER Alias
-    The Name of the Alias
+    The name of the alias may only consist of the characters "a-z, A-Z, 0-9 and _".
 
     .PARAMETER Type
     The Type of the alias, could be Host, Network or Port
@@ -144,7 +166,7 @@ Function Edit-PFAlias{
     The description of the address value
 
     .PARAMETER Description
-    The description of the Alias
+    A description may be entered here for administrative reference (not parsed).
     
     .EXAMPLE
     ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service alias -action edit -Alias UploadTest -Type Host -address 192.168.0.5 -Detail 'To test XMLRPC' -Description 'Test the upload of a alias' -notls
@@ -184,9 +206,9 @@ Function Edit-PFAlias{
                 }
                 $aliasObject | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
                     # Only set if variable is set
-                    if(get-variable $_.name -valueOnly -ErrorAction Ignore){ # Only set object if variable is set. don't override with empty value's
-                        $aliasObject.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
-                    }
+                    if(-not [string]::IsNullOrWhiteSpace($(get-variable $_.name -valueOnly -ErrorAction Ignore))){ # Only set object if variable is set. don't override with empty value's
+                    $aliasObject.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
+                }
                 }
             }
         }
@@ -205,7 +227,7 @@ Function Delete-PFAlias{
     if the alias name excists we delete it.
 
     .PARAMETER Alias
-    The Name of the Alias
+    The name of the alias may only consist of the characters "a-z, A-Z, 0-9 and _".
 
     .EXAMPLE
     ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service alias -action Delete -Alias host_alias -notls
@@ -237,13 +259,13 @@ Function AddEntry-PFAlias{
     first it check's if it can find the alias, if not it will throw a error.
 
     .PARAMETER Alias
-    The Name of the Alias
+    The name of the alias may only consist of the characters "a-z, A-Z, 0-9 and _".
 
     .PARAMETER Address
     The IP, Network address or the Port number
 
     .PARAMETER Detail
-    The description of the address value
+    A description may be entered here for administrative reference (not parsed).
   
     .EXAMPLE
     ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service alias -action addEntry -Alias host_alias -address 192.168.0.5 -Detail 'To test XMLRPC' -notls
@@ -290,7 +312,7 @@ Function DeleteEntry-PFAlias{
     if it excists we delete the entry
 
     .PARAMETER Alias
-    The Name of the Alias
+    The name of the alias may only consist of the characters "a-z, A-Z, 0-9 and _".
 
     .PARAMETER Address
     The IP, Network address or the Port number
@@ -389,8 +411,34 @@ Function Write-PFAlias{
         }
     $Collection | Format-table Name,Type,Description,Entry
     }
-
 }
+
+Function Write-PFCert{
+    <#
+    .SYNOPSIS
+    the Write-PFCert Function display's the cert's ReferenceID and Description of the pfsense
+
+    .DESCRIPTION
+    the Write-PFCert Function display's the cert's ReferenceID and Description of the pfsense
+  
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service cert -action print -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+    
+    #>
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+    }
+    process{
+        $PFObject = get-PFCert -Server $InputObject
+        $PFObject | Format-table ReferenceID,Description
+    }
+}
+
+
 Function Edit-PFDHCPd{
     <#
     .SYNOPSIS
@@ -434,91 +482,49 @@ Function Edit-PFDHCPd{
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
-        [Parameter(Mandatory=$True, HelpMessage='The Interface the DHCPd listen on')] [string]$Interface,
-        [Parameter(Mandatory=$True, HelpMessage='The Starting ip address of the pool')] [string]$RangeFrom,
-        [Parameter(Mandatory=$True, HelpMessage='The Last IP address of the pool')] [string]$RangeTo,
-        [Parameter(Mandatory=$True, HelpMessage='The Netmask used by the pool')] [string]$netmask,
+        [Parameter(Mandatory=$True, HelpMessage='The Interface the DHCPd listen on')][Alias('Interface')] [string]$Intfa,
+        [Parameter(Mandatory=$false, HelpMessage='The Starting ip address of the pool')] [string]$RangeFrom,
+        [Parameter(Mandatory=$false, HelpMessage='The Last IP address of the pool')] [string]$RangeTo,
+        [Parameter(Mandatory=$false, HelpMessage='The Netmask used by the pool')] [string]$netmask,
         [Parameter(Mandatory=$false)][String]$Gateway,
         [Parameter(Mandatory=$false, HelpMessage='The Domain')] [string]$Domain,
-        [Parameter(Mandatory=$True, HelpMessage='The DNSServer used bij the pool')] [string]$DNSServer,
-        [Parameter(Mandatory=$True, HelpMessage='The NTPServer used bij the pool')] [string]$NTPServer
+        [Parameter(Mandatory=$false, HelpMessage='The DNSServer used bij the pool')] [string]$DNSServer,
+        [Parameter(Mandatory=$false, HelpMessage='The NTPServer used bij the pool')] [string]$NTPServer,
+        [Parameter(Mandatory=$false, HelpMessage='Enable or disable the dhcp deamon on the interface')] [Bool]$Enable
     )
     Process{
         $PFObject = get-pfdhcpd -Server $InputObject
-        if($Interface -NotIn $PFObject.interface.Description){
-            throw "the DHCPD doen not know $($Interface), Make sure the interface has a fixed ip address and not a /32 subnet."
+        if($Intfa -NotIn $PFObject.interface.Description){
+            throw "the DHCPD doen not know $($Intfa), Make sure the interface has a fixed ip address and not a /32 subnet."
         }
+        $Interface = $($InputObject | Get-PFInterface -Description $Intfa)
         foreach($dhcpdObject in $PFObject){
             if($dhcpdObject.interface.Description -eq $Interface){
-                # check if the pool addresses are in the interface range
-                [net.IPAddress]$InterfaceAddress = $dhcpdObject.interface.IPv4Address
-                $Int64 = ([convert]::ToInt64(('1' * $($dhcpdObject.interface.IPv4Subnet) + '0' * (32 - $($dhcpdObject.interface.IPv4Subnet))), 2)) 
-                [net.IPAddress]$subnet = '{0}.{1}.{2}.{3}' -f ([math]::Truncate($Int64 / 16777216)).ToString(), ([math]::Truncate(($Int64 % 16777216) / 65536)).ToString(), ([math]::Truncate(($Int64 % 65536)/256)).ToString(), ([math]::Truncate($Int64 % 256)).ToString()
-                [net.IPAddress]$Rangefromaddress = $Rangefrom
-                [net.IPAddress]$RangeToaddress = $RangeTo
-                if(($InterfaceAddress.Address -band $subnet.address) -ne ($Rangefromaddress.address -band $subnet.address) -or `
-                ($InterfaceAddress.Address -band $subnet.address) -ne ($RangeToaddress.address -band $subnet.address)){
-                    Throw "the pool range is not in the same subnet as the interface"
+                # check if the pool addresses are in the interface range, but only if range is set
+                if(($RangeFrom) -or ($RangeTo)){
+                    [net.IPAddress]$InterfaceAddress = $dhcpdObject.interface.IPv4Address
+                    $Int64 = ([convert]::ToInt64(('1' * $($dhcpdObject.interface.IPv4Subnet) + '0' * (32 - $($dhcpdObject.interface.IPv4Subnet))), 2)) 
+                    [net.IPAddress]$subnet = '{0}.{1}.{2}.{3}' -f ([math]::Truncate($Int64 / 16777216)).ToString(), ([math]::Truncate(($Int64 % 16777216) / 65536)).ToString(), ([math]::Truncate(($Int64 % 65536)/256)).ToString(), ([math]::Truncate($Int64 % 256)).ToString()
+                    [net.IPAddress]$Rangefromaddress = $Rangefrom
+                    [net.IPAddress]$RangeToaddress = $RangeTo
+                    if(($InterfaceAddress.Address -band $subnet.address) -ne ($Rangefromaddress.address -band $subnet.address) -or `
+                    ($InterfaceAddress.Address -band $subnet.address) -ne ($RangeToaddress.address -band $subnet.address)){
+                        Throw "the pool range is not in the same subnet as the interface"
+                    }
                 }
                 # Set al the settings
                 $dhcpdObject | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
                     # Only set if variable is set
-                    if(get-variable $_.name -valueOnly -ErrorAction Ignore){ # Only set object if variable is set. don't override with empty value's
-                        $dhcpdObject.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
-                    }
+                    if(-not [string]::IsNullOrWhiteSpace($(get-variable $_.name -valueOnly -ErrorAction Ignore))){ # Only set object if variable is set. don't override with empty value's
+                    $dhcpdObject.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
+                }
                 }
             }
         }
         Set-PFDHCPd -InputObject $PFserver -NewObject $PFObject
     }
 }
-Function EnableOrDisable-PFDHCPd{
-    <#
-    .SYNOPSIS
-    The EnableOrDisable-PFDHCPd function enable's or disables the dhcp server on a interface
 
-    .DESCRIPTION
-    The EnableOrDisable-PFDHCPd function enable's or disables the dhcp server on a interface
-
-    .PARAMETER Interface
-    The interface the dhcpd is going to listen on
-
-    .PARAMETER EnableOrDisable
-    EnableOrDisable is a Bool variable, if true it enable's the dhcp server on that interface. if false, it disable's
-
-  
-    .EXAMPLE
-    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dhcpd -action Disable -Interface client -notls
-
-    .EXAMPLE
-    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dhcpd -action Disable -Interface client -notls
-
-
-    .LINK
-    https://github.com/RaulGrayskull/PFSense_Powershell
-    
-    #>
-    [CmdletBinding()]
-    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
-            [Parameter(Mandatory=$true, HelpMessage='The Interface the DHCPd listen on')] [string]$Interface,
-            [Parameter(Mandatory=$true, HelpMessage='The Interface the DHCPd listen on')] [bool]$EnableOrDisable
-            )
-    Begin{
-        $InterfaceObject = $($InputObject | Get-PFInterface -Description $Interface)
-    }
-    process{
-        $PFObject = get-pfdhcpd -Server $InputObject
-        if($Interface -NotIn $PFObject.interface.Description){
-            throw "We cannot find $($interface) in the dhcpd"
-        }
-        $PFObject | ForEach-Object{
-            if($InterfaceObject.Description -eq $_.Interface.Description){
-                $_.enable = $EnableOrDisable
-            }
-        }        
-        Set-PFDHCPd -InputObject $PFserver -NewObject $PFObject
-    }
-}
 Function Write-PFDHCPd{
     <#
     .SYNOPSIS
@@ -688,7 +694,7 @@ Function Edit-PFDHCPstaticmap{
         [Parameter(Mandatory=$false, HelpMessage='The Domain')] [string]$Domain,
         [Parameter(Mandatory=$True, HelpMessage='The Client ID for this entry, this is mandatory but can be the mac address')] [string]$ClientID,
         [Parameter(Mandatory=$True, HelpMessage='Mac Address of the new entry')] [string]$MACaddr,
-        [Parameter(Mandatory=$True, HelpMessage='IP Address of the new entry')] [string]$Address,
+        [Parameter(Mandatory=$True, HelpMessage='IP Address of the new entry')][alias('Address')] [string]$IPaddr,
         [Parameter(Mandatory=$false, HelpMessage='Description')] [string]$Description,
         [Parameter(Mandatory=$false, HelpMessage='Gateway, if non is enterd the gateway of the pool is used')] [string]$Gateway,
         [Parameter(Mandatory=$false, HelpMessage='Gateway, if non is enterd the DNS Server of the pool is used')] [string]$DNSServer,
@@ -699,7 +705,6 @@ Function Edit-PFDHCPstaticmap{
         if($interface -NotIn $PFObject.interface.Description){
             Throw "Could not find Interface $($interface)"
         }
-        $IPaddr = $Address
         foreach($DHCPObject in $PFObject){
             if($DHCPObject.Interface.Description -eq $Interface){
                 if($MACaddr -NotIn $DHCPObject.staticmaps.MACaddr){Throw "Could not find Mac address $($Macaddress)"}
@@ -709,7 +714,7 @@ Function Edit-PFDHCPstaticmap{
                     if(($staticmap.MACaddr -eq $MACaddr) -and ($staticmap.ClientID -eq $ClientID)){
                         $staticmap | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
                             # Only set if variable is set
-                            if(get-variable $_.name -valueOnly -ErrorAction Ignore){ # Only set object if variable is set. don't override with empty value's
+                            if(-not [string]::IsNullOrWhiteSpace($(get-variable $_.name -valueOnly -ErrorAction Ignore))){ # Only set object if variable is set. don't override with empty value's
                                 if($_.name -eq "Interface"){} #the Interface is not set in the object, but in it's parrent
                                 else{
                                     $staticmap.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
@@ -811,6 +816,31 @@ Function Write-PFDHCPstaticmap{
             }catch{}
         }
         $Collection | Format-table Interface,Hostname,Domain,ClientID,MACaddr,IPaddr,Description,Gateway,DNSserver,NTPServer
+    }
+}
+
+Function Write-PFDnsMasq{
+    <#
+    .SYNOPSIS
+    
+
+    .DESCRIPTION
+    
+  
+    .EXAMPLE
+    
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+    
+    #>
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+    }
+    process{
+        $PFObject = get-PFDnsMasq -Server $InputObject
+        $PFObject | Format-table Enable,Port,Interface,DHCPReg,DHCPRegstatic,DHCPfirst,DomainNeeded,StrictOrder,NoPrivateReverse,Strictbind
     }
 }
 
@@ -1112,7 +1142,7 @@ Function edit-PFFirewall{
                 # Set al the settings
                 $FirewallRule | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
                     # Only set if variable is set
-                    if(get-variable $_.name -valueOnly -ErrorAction Ignore){ # Only set object if variable is set. don't override with empty value's
+                    if(-not [string]::IsNullOrWhiteSpace($(get-variable $_.name -valueOnly -ErrorAction Ignore))){ # Only set object if variable is set. don't override with empty value's
                         $FirewallRule.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
                     }
                 }
@@ -1154,17 +1184,12 @@ function Move-PFFirewall{
         if($NewLineNumber -eq $OldLineNumber){Throw "The Old and New linenumber are equal, no need to move exiting"}
         if($NewLineNumber -NotIn $PFObject.lineNumber){Throw "The NewLineNumber does not excists on the pfsense"}
         if($oldLineNumber -NotIn $PFObject.lineNumber){Throw "The OldLineNumber does not excists on the pfsense"}
+        $workObject = $PFObject | where-Object {$_.Linenumber -eq $OldLineNumber} # save the working object to change it's linenumber after the movement's have been done
         if($NewLineNumber -gt $OldLineNumber){
-            $PFObject | ForEach-Object {
-                if($_.Linenumber -eq $OldLineNumber){$workObject = $_} # save the working object to change it's linenumber after the movement's have been done
-                if(($_.linenumber -le $NewLineNumber) -and ($_.Linenumber -ge $OldLineNumber)){$_.linenumber -= 1}
-            }
+            $PFObject | Where-Object {($_.linenumber -le $NewLineNumber) -and ($_.Linenumber -ge $OldLineNumber)} | ForEach-Object {$_.Linenumber -= 1}
         }
         if($NewLineNumber -lt $OldLineNumber){
-            $PFObject | ForEach-Object {
-                if($_.Linenumber -eq $OldLineNumber){$workObject = $_}
-                if(($_.linenumber -ge $NewLineNumber) -and ($_.Linenumber -le $OldLineNumber)){$_.linenumber += 1}
-            }
+            $PFObject | Where-Object {($_.linenumber -ge $NewLineNumber) -and ($_.Linenumber -le $OldLineNumber)} | ForEach-Object {$_.Linenumber += 1}
         }
         $workObject.linenumber = $NewLineNumber 
         Set-pffirewall -InputObject $InputObject -NewObject $PFObject
@@ -1431,7 +1456,7 @@ Function Edit-PFGateway{
             if($GatewayObject.name -eq $name){
                 $GatewayObject | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
                     # Only set if variable is set
-                    if(get-variable $_.name -valueOnly -ErrorAction Ignore){ # Only set object if variable is set. don't override with empty value's
+                    if(-not [string]::IsNullOrWhiteSpace($(get-variable $_.name -valueOnly -ErrorAction Ignore))){ # Only set object if variable is set. don't override with empty value's
                         $GatewayObject.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
                     }
                 }
@@ -1476,8 +1501,119 @@ Function Write-PFGateway{
     }
 }
 
+Function Edit-PFInterface{
+    <#
+    .SYNOPSIS
+    The Edit-PFGateway function edit's a Gateway to the PFSense. 
+
+    .DESCRIPTION
+    The Edit-PFGateway function edit's a Gateway to the PFSense. 
+    The Unique Identifier is the name, the ipaddress and monitoring address must also be unique on the pfsense
+
+    .PARAMETER Name
+    Internal name of the interface, For now this cannot be changed by this script
+    It is here for when vlan's are implemented into the script
+
+    .PARAMETER Description 
+    Username of the interface
+
+    .PARAMETER Interface 
+    The FreeBSD Name of the interface, For now this cannot be changed by this script. 
+    It is here for when vlan's are implemented into the script
+
+    .PARAMETER IPv4Address 
+    IPv4 Address
+
+    .PARAMETER IPv4Subnet 
+    IPv4 Subnet
+
+    .PARAMETER IPv4Gateway 
+    IPv4 Gateway
+
+    .PARAMETER IPv6Address 
+    IPv6 Address
+
+    .PARAMETER IPv6Subnet 
+    IPv6 Subnet
+
+    .PARAMETER IPv6Gateway 
+    IPv6 Gateway
+
+    .PARAMETER blockpriv 
+    Block private networks and loopback addresses
+
+    .PARAMETER BlockBogons 
+    Block bogon networks
+
+    .PARAMETER Enable
+    Enable or disable the interface, this is a bool so only take's $True or $False
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service interface -action Edit -Description Client -IPv4Address 192.168.199.1 -IPv4Subnet 231 -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+    
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$false, HelpMessage='Internal name of the interface')][string] $Name,
+        [Parameter(Mandatory=$True, HelpMessage='Username of the interface')][string] $Description,
+        [Parameter(Mandatory=$false, HelpMessage='The FreeBSD Name of the interface')] [string] $Interface,
+        [Parameter(Mandatory=$false, HelpMessage='IPv4 Address')][Alias('IPv4A')] [string] $IPv4Address,
+        [Parameter(Mandatory=$false, HelpMessage='IPv4 Subnet')][Alias('IPv4S')] [string] $IPv4Subnet,
+        [Parameter(Mandatory=$false, HelpMessage='IPv4 Gateway')][Alias('IPv4G')] [string] $IPv4Gateway,
+        [Parameter(Mandatory=$false, HelpMessage='IPv6 Address')][Alias('IPv6A')] [string] $IPv6Address,
+        [Parameter(Mandatory=$false, HelpMessage='IPv6 Subnet')][Alias('IPv6S')] [string] $IPv6Subnet,
+        [Parameter(Mandatory=$false, HelpMessage='IPv6 Gateway')][Alias('IPv6')] [string] $IPv6Gateway,
+        [Parameter(Mandatory=$false, HelpMessage='Block private networks and loopback addresses')][string] $blockpriv,
+        [Parameter(Mandatory=$false, HelpMessage='Block bogon networks')][string] $BlockBogons,
+        [Parameter(Mandatory=$false, HelpMessage='Block bogon networks')][bool] $Enable
+    )
+    Begin{}
+    Process{
+        $PFObject = get-pfinterface -Server $InputObject
+        # Check User input
+        if($Description -NotIn $PFObject.Description){Throw "The Interface: $($name). Cannot be found"}
+        try{ # Check if the ipaddress are valid
+            ($IPv4Address,$IPv4Gateway,$IPv6Address,$IPv6Gateway) | Foreach {
+                if($_){# Only test if it is a valid variable
+                    [Ipaddress]$IPCheck = $_
+                }
+            }
+        }
+        catch{throw "{0}" -f $_.Exception.Message}
+        if(($IPv4Subnet -NotIn 1..32) -and ($IPv4Subnet)){Throw "{0} is not a valid IPv4Subnet" -f $IPv4Subnet}
+        if(($IPv6Subnet -NotIn 1..128) -and ($IPv6Subnet)){Throw "{0} is not valid IPv4Subnet" -f $IPv6Subnet}
+
+        # Actual Edit
+        $WorkingObject = $PFObject | Where-Object {$_.Description -eq $Description}
+        $WorkingObject | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+            # Only set if variable is set
+            if(-not [string]::IsNullOrWhiteSpace($(get-variable $_.name -valueOnly -ErrorAction Ignore))){ # Only set object if variable is set. don't override with empty value's
+                $WorkingObject.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
+            }
+        }
+        Set-PFInterface -InputObject $InputObject -NewObject $PFObject
+    }
+}
 
 Function Write-PFInterface{
+    <#
+    .SYNOPSIS
+    The Write-PFInterface function Display's all the Interface's of the pfsense
+
+    .DESCRIPTION
+    The Write-PFInterface function Display's all the Interface's of the pfsense
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service Interface -action print -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
     Begin{
@@ -1496,79 +1632,160 @@ Function Write-PFInterface{
 }
 
 Function Add-PFNatRule{
+    <#
+    .SYNOPSIS
+    The Add-PFNatRule function Add's a NatRule / PortfwdRule to the PFSense. 
+
+    .DESCRIPTION
+    The Add-PFNatRule function Add's a NatRule / PortfwdRule to the PFSense. 
+
+    .PARAMETER Interface
+    The Interface the port forward is going to be created on
+
+    .PARAMETER Protocol
+    Network protocol like: TCP, UDP, ICMP
+
+    .PARAMETER SourceAddress
+    Source Address
+
+    .PARAMETER SourcePort
+    Source Port
+
+    .PARAMETER DestAddress
+    Destination Address
+
+    .PARAMETER DestPort
+    Destination Port
+
+    .PARAMETER NatIp
+    The Local Ip Address
+
+    .PARAMETER NatPort
+    The Local Port
+
+    .PARAMETER Description
+    The Description
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service Portfwd -action Add -Interface Client -Protocol UDP -SourceAddress 'Manage Network' -SourcePort any -DestAddress 192.168.11.0/23 -DestPort 8443 -NatIp 192.168.1.4 -NatPort 443 -Description 'this is a test' -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
-        [Parameter(Mandatory=$True, HelpMessage='The Interface the port forward is going to be created on')] [string]$Interface,
+        [Parameter(Mandatory=$True, HelpMessage='The Interface the port forward is going to be created on')][Alias('Interface')] [string]$Intface,
         [Parameter(Mandatory=$false, HelpMessage='Network protocol like: TCP, UDP, ICMP')] [string] $Protocol,
         [Parameter(Mandatory=$false, HelpMessage='Source Address')] [string] $SourceAddress,
         [Parameter(Mandatory=$false, HelpMessage='Source Port')] [string] $SourcePort,
-        [Parameter(Mandatory=$false, HelpMessage='Destination Address')] [string] $DestAddress,
-        [Parameter(Mandatory=$false, HelpMessage='Destination Port')] [string] $DestPort,
-        [Parameter(Mandatory=$false, HelpMessage='The Local Ip Address')] [string] $NatIp,
-        [Parameter(Mandatory=$false, HelpMessage='The Local Port')] [string] $NatPort,
+        [Parameter(Mandatory=$false, HelpMessage='Destination Address')][Alias('DestAddress')] [string] $DestinationAddress,
+        [Parameter(Mandatory=$false, HelpMessage='Destination Port')][Alias('DestPort')] [string] $DestinationPort,
+        [Parameter(Mandatory=$false, HelpMessage='The Local Ip Address')][Alias('NatIp')] [string] $target,
+        [Parameter(Mandatory=$false, HelpMessage='The Local Port')][Alias('NatPort')] [string] $LocalPort,
         [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Description
         )
     Begin{
-        $Updated = @{
+        $Created = $Updated = @{
             Username = $Username
             time = [int](get-date -UFormat "%s")
         }
     }
     process{
-        $Properties = @{
-            Interface = $($InputObject | Get-PFInterface -Description $Interface)
-            Protocol = $Protocol
-            SourceAddress = $SourceAddress
-            SourcePort = $SourcePort
-            DestinationAddress = $DestAddress
-            DestinationPort = $DestPort
-            target = $NatIp
-            LocalPort = $NatPort
-            Description = $Description
-            Updated = $Updated
-            created = $Updated
+        $PFObject = Get-PFNatRule -Server $InputObject
+        # Check User input
+#        try{ # Check if the ipaddress are valid
+#            ($SourceAddress,$DestAddress,$NatPort) | Foreach {
+#                if($_){# Only test if it is a valid variable
+#                    [Ipaddress]$IPCheck = $_
+#                }
+#            }
+#        }
+#        catch{throw "{0}" -f $_.Exception.Message}
+        # Actual adding
+        $interface = $($InputObject | Get-PFInterface -Description $Intface)
+        $Object = New-Object -TypeName "PFNatRule" -Property $Properties
+        $Properties = @{}
+        $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                $Properties.add($_.name,$(get-variable $_.name -valueOnly -ErrorAction Ignore)) # The -erroraction Ignore is used because not all properties are variable's 
         }
-    $new = New-Object -TypeName "PFNATRule" -Property $Properties
-    $PFObject = get-PFNATRule -Server $InputObject
-    $PFObject += $new
-    # ToDo: Create check to look for duplicate
-    Set-PFNatRule -InputObject $InputObject -NewObject $PFObject
+        $NewObject = New-Object -TypeName "PFNatRule" -Property $Properties
+        $PFObject += $NewObject
+
+        Set-PFNatRule -InputObject $InputObject -NewObject $PFObject
     }
 }
 
 
 Function Delete-PFNatRule{
+    <#
+    .SYNOPSIS
+    The Delete-PFNatRule function Delete's a NatRule / PortfwdRule to the PFSense. 
+
+    .DESCRIPTION
+    The Delete-PFNatRule function Delete's a NatRule / PortfwdRule to the PFSense. 
+
+    .PARAMETER Interface
+    The Interface the port forward is going to be created on
+
+    .PARAMETER Protocol
+    Network protocol like: TCP, UDP, ICMP
+
+    .PARAMETER SourceAddress
+    Source Address
+
+    .PARAMETER SourcePort
+    Source Port
+
+    .PARAMETER DestAddress
+    Destination Address
+
+    .PARAMETER DestPort
+    Destination Port
+
+    .PARAMETER NatIp
+    The Local Ip Address
+
+    .PARAMETER NatPort
+    The Local Port
+
+    .PARAMETER Description
+    The Description
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service Portfwd -action Add -Interface Client -Protocol UDP -SourceAddress 'Manage Network' -SourcePort any -DestAddress 192.168.11.0/23 -DestPort 8443 -NatIp 192.168.1.4 -NatPort 443 -Description 'this is a test' -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
-        [Parameter(Mandatory=$True, HelpMessage='The Interface the port forward is going to be created on')] [string]$Interface,
+        [Parameter(Mandatory=$True, HelpMessage='The Interface the port forward is going to be created on')][Alias('Interface')] [string]$Intface,
         [Parameter(Mandatory=$false, HelpMessage='Network protocol like: TCP, UDP, ICMP')] [string] $Protocol,
         [Parameter(Mandatory=$false, HelpMessage='Source Address')] [string] $SourceAddress,
         [Parameter(Mandatory=$false, HelpMessage='Source Port')] [string] $SourcePort,
-        [Parameter(Mandatory=$false, HelpMessage='Destination Address')] [string] $DestAddress,
-        [Parameter(Mandatory=$false, HelpMessage='Destination Port')] [string] $DestPort,
-        [Parameter(Mandatory=$false, HelpMessage='The Local Ip Address')] [string] $NatIp,
-        [Parameter(Mandatory=$false, HelpMessage='The Local Port')] [string] $NatPort,
+        [Parameter(Mandatory=$false, HelpMessage='Destination Address')][Alias('DestAddress')] [string] $DestinationAddress,
+        [Parameter(Mandatory=$false, HelpMessage='Destination Port')][Alias('DestPort')] [string] $DestinationPort,
+        [Parameter(Mandatory=$false, HelpMessage='The Local Ip Address')][Alias('NatIp')] [string] $target,
+        [Parameter(Mandatory=$false, HelpMessage='The Local Port')][Alias('NatPort')] [string] $LocalPort,
         [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Description
         )
     Begin{
     }
     process{
-        $Properties = @{
-            Interface = $($InputObject | Get-PFInterface -Description $Interface)
-            Protocol = $Protocol
-            SourceAddress = $SourceAddress
-            SourcePort = $SourcePort
-            DestinationAddress = $DestAddress
-            DestinationPort = $DestPort
-            target = $NatIp
-            LocalPort = $NatPort
-            Description = $Description
-        }
-    $Delete = New-Object -TypeName "PFNATRule" -Property $Properties
+    $Interface = $($InputObject | Get-PFInterface -Description $Intface)
+    $Properties = @{}
     $PFOriginal = get-PFNATRule -Server $InputObject
-     $PFObject = $PFOriginal | Where-Object {
+    $Object = New-Object -TypeName "PFNATRule" -Property $Properties
+    $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+            $Properties.add($_.name,$(get-variable $_.name -valueOnly -ErrorAction Ignore)) # The -erroraction Ignore is used because not all properties are variable's 
+    }
+    $Delete = New-Object -TypeName "PFNATRule" -Property $Properties
+
+    $PFObject = $PFOriginal | Where-Object {
         ($_.Protocol -ne $Delete.protocol) -or
         ($_.SourceAddress -ne $Delete.SourceAddress) -or
         ($_.SourcePort -ne $Delete.SourcePort) -or
@@ -1583,53 +1800,98 @@ Function Delete-PFNatRule{
 
 
 Function Write-PFNatRule{
+    <#
+    .SYNOPSIS
+    The Write-PFNatRule function Display's all the Nat / portforwarder rule's of the pfsense
+
+    .DESCRIPTION
+    The Write-PFNatRule function Display's all the Nat / portforwarder rule's of the pfsense
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service Interface -action print -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
     Begin{
     }
     process{
         $PFObject = get-PFNATRule -Server $InputObject
-        $exclude = ("Source","Destination","updated","created")
-        $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
+        $PFObject | Format-table Interface,Protocol,SourceAddress,SourcePort,DestinationAddress,DestinationPort,target,LocalPort,Description
     }
 }
 Function Add-PFStaticRoute{
     <#
-    Create a new PFStaticRoute object with the value's you would like to add
+    .SYNOPSIS
+    The Add-PFStaticRoute function Add's a Staticroute to the PFSense. 
+
+    .DESCRIPTION
+    The Add-PFStaticRoute function Add's a Staticroute to the PFSense. 
+
+    .PARAMETER Network
+    The Network where for you are adding a route
+
+    .PARAMETER Gateway
+    The gateway where thru the network can be reached
+
+    .PARAMETER Description
+    The Description of the route
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service Portfwd -action Add -Interface Client -Protocol UDP -SourceAddress 'Manage Network' -SourcePort any -DestAddress 192.168.11.0/23 -DestPort 8443 -NatIp 192.168.1.4 -NatPort 443 -Description 'this is a test' -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
     #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
-        [Parameter(Mandatory=$true)][String]$Network,
-        [Parameter(Mandatory=$true)][String]$Gateway,
-        [Parameter(Mandatory=$true)][String]$Description
+        [Parameter(Mandatory=$true, HelpMessage='The Network where for you are adding a route')][String]$Network,
+        [Parameter(Mandatory=$true, HelpMessage='The gateway where thru the network can be reached')][Alias('Gateway')][String]$GatewayString,
+        [Parameter(Mandatory=$true, HelpMessage='The Description of the route')][String]$Description
     )
     begin{
         $PFObject = Get-PFStaticRoute -Server $InputObject
     }
     Process{
-        $Properties = @{
-            Network = $Network
-            Gateway = $($InputObject | Get-PFGateway -Name $Gateway)
-            Description = $Description
+        # Check User Input
+        if($Network -in $PFObject.Network){Throw "A route to these destination networks already exists: {0}" -f $Network}
+        # Check if the gateway excisit on the pfsense 
+        $Gateway = $InputObject | Get-PFGateway -Name $GatewayString
+        if(-not $Gateway){Throw "Could not find gateway: {0} on the PFSense" -f $GatewayString }
+        # Actual adding
+        $Object = New-Object -TypeName "PFStaticRoute" -Property $Properties
+        $Properties = @{}
+        $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                $Properties.add($_.name,$(get-variable $_.name -valueOnly -ErrorAction Ignore)) # The -erroraction Ignore is used because not all properties are variable's 
         }
         $NewObject = New-Object -TypeName "PFStaticRoute" -Property $Properties
-        if($NewObject.Network -in $PFObject.Network){
-            $Index = 0
-            While($PFObject[$index]){
-                if($PFObject[$index].Network -eq $NewObject.Network){$PFObject[$index] = $NewObject}
-                $index++
-            }
-        }
-        else{$PFObject = $PFObject + $NewObject}
-
+        $PFObject += $NewObject
         Set-PFStaticRoute -InputObject $InputObject -NewObject $PFObject
     }
 }
 
 Function Delete-PFStaticRoute{
     <#
-    Create a new PFStaticRoute object with the value's you would like to add
+    .SYNOPSIS
+    The Delete-PFStaticRoute function Delete's a Staticroute on the PFSense. 
+
+    .DESCRIPTION
+    The Delete-PFStaticRoute function Delete's a Staticroute on the PFSense. 
+
+    .PARAMETER Network
+    The Network you would like to delete
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service staticroute -action Delete -Network 192.168.2.0/24 -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
     #>
     [CmdletBinding()]
     param (
@@ -1639,70 +1901,916 @@ Function Delete-PFStaticRoute{
         $PFObject = Get-PFStaticRoute -Server $InputObject
     }
     process{
-        if($Network -in $PFObject.Network){
-            $PFObject = $PFObject | Where-Object {$Network -ne $_.Network}
+        if($Network -NotIn $PFObject.network){Throw "Could not find network {0}, unable to delete" -f $Network}
+        $PFUploadObject = $PFObject | Where-Object {$_.network -ne $Network}
+        Set-PFStaticRoute -InputObject $InputObject -NewObject $PFUploadObject
+    }
+}
+
+Function Edit-PFStaticRoute{
+    <#
+    .SYNOPSIS
+    The edit-PFStaticRoute function edit's a Staticroute on the PFSense. 
+
+    .DESCRIPTION
+    The edit-PFStaticRoute function edit's a Staticroute on the PFSense. 
+
+    .PARAMETER Network
+    The Uniq ident you would like to edit
+
+    .PARAMETER Gateway
+    The new gateway
+
+    .PARAMETER Description
+    The new description
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service staticroute -action Edit -Network 192.168.2.0/24 -Gateway Null4 -Description 'To Null Route the 192.168.51.0/24 Network' -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$true, HelpMessage='The Network where for you are adding a route')][String]$Network,
+        [Parameter(Mandatory=$false, HelpMessage='The gateway where thru the network can be reached')][Alias('Gateway')][String]$GatewayString,
+        [Parameter(Mandatory=$false, HelpMessage='The Description of the route')][String]$Description
+    )
+    begin{
+        $PFObject = Get-PFStaticRoute -Server $InputObject
+    }
+    Process{
+        # Check User Input
+        if($Network -NotIn $PFObject.network){Throw "Could not find network {0}, unable to Edit" -f $Network}
+        # Check if the gateway excisit on the pfsense 
+        if($GatewayString){
+            $Gateway = $InputObject | Get-PFGateway -Name $GatewayString
+            if(-not $Gateway){Throw "Could not find gateway: {0} on the PFSense" -f $GatewayString }
         }
-        else{Write-Error "Could not find network $Network, unable to delete"}
+        # Actual adding
+        $WorkingObject = $PFObject | Where-Object {$_.network -eq $Network}
+        $WorkingObject | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+            if(get-variable $_.name -valueOnly -ErrorAction Ignore){
+                $WorkingObject.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
+            }
+        }
         Set-PFStaticRoute -InputObject $InputObject -NewObject $PFObject
     }
 }
 
-
 Function Write-PFStaticRoute{
+    <#
+    .SYNOPSIS
+    The Write-PFStaticRoute function Prints all the Staticroute of the PFSense. 
+
+    .DESCRIPTION
+    The Write-PFStaticRoute function Prints all the Staticroute of the PFSense. 
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service staticroute -action print -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
     Begin{
     }
     process{
         $PFObject = get-PFStaticroute -Server $InputObject
-        $exclude = ("")
-        $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
+        $PFObject | Format-table Network,Gateway,Description
+    }
+}
+
+Function Edit-PFUnbound{
+    <#
+    .SYNOPSIS
+    The Edit-PFStaticRoute function Edit's the unbound DNSSettings on the PFSense. 
+
+    .DESCRIPTION
+    The Edit-PFStaticRoute function Edit's the unbound DNSSettings on the PFSense. 
+    
+    .PARAMETER ActiveInt / ActiveInterface
+    The Active interfaces
+
+    .PARAMETER OutgoingInt / OutgoingInterface
+    The Outgoint Interfaces
+
+    .PARAMETER dnssec
+    DNS Sec enable or disable
+
+    .PARAMETER Enable
+    Enable or disable the DNS Unbound Deamon
+
+    .PARAMETER sslport
+    The SSL port
+
+    .PARAMETER CustomOptions
+    Costum Options "This must be a single string"
+
+    .PARAMETER sslcertref
+    SSL cert Ref of a ssl certificate known by the PFsense
+
+    .PARAMETER port
+    The port you would like to use
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsResolver -action edit -ActiveInterface 'All,Client' -OutgoingInterface Client -dnssec $True -port 53 -sslport 853 -notls
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsResolver -action Disable -notls
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsResolver -action Enable -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$false, HelpMessage='The Active interfaces')][Alias('ActiveInterface')][string] $ActiveInt,
+        [Parameter(Mandatory=$false, HelpMessage='The Outgoint Interfaces')][Alias('OutgoingInterface')][string] $OutgoingInt,
+        [Parameter(Mandatory=$false, HelpMessage='DNS Sec enable or disable')][bool] $dnssec,
+        [Parameter(Mandatory=$false, HelpMessage='Enable or disable the DNS Unbound Deamon')][bool] $Enable,
+        [Parameter(Mandatory=$false, HelpMessage='The SSL port')][string] $sslport,
+        [Parameter(Mandatory=$false, HelpMessage='Costum Options')][string] $CustomOptions,
+        [Parameter(Mandatory=$false, HelpMessage='SSL cert Ref of a ssl certificate known by the PFsense')][string] $sslcertref,
+        [Parameter(Mandatory=$false, HelpMessage='The port you would like to use')][string] $port
+    )
+    Begin{
+        $Object = (New-Object -TypeName "PFUnbound")
+    }
+    process{
+        $PFObject = Get-PFUnbound -Server $InputObject
+        # Change to the correct format
+        if(($ActiveInt) -and ($ActiveInt -match ",")){
+            $ActiveInt.split(",") | foreach{
+                [array]$ActiveInterface += $($InputObject | Get-PFInterface -Description $_)
+            }
+        }
+        elseif($ActiveInt){[array]$ActiveInterface = $($InputObject | Get-PFInterface -Description $ActiveInt)}
+        if(($OutgoingInt) -and ($OutgoingInt -match ",")){
+            $OutgoingInt.split(",") | foreach{
+                [array]$OutgoingInterface += $($InputObject | Get-PFInterface -Description $_)
+            }
+        }
+        elseif($OutgoingInt){[array]$OutgoingInterface = $($InputObject | Get-PFInterface -Description $OutgoingInt)}
+
+
+        $PFObject | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+            if(-not [string]::IsNullOrWhiteSpace($(get-variable $_.name -valueOnly -ErrorAction Ignore))){ # Only set object if variable is set. don't override with empty value's
+                $PFObject.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
+            }
+        }
+        Set-PFUnbound -InputObject $PFserver -NewObject $PFObject
     }
 }
 
 
 Function Write-PFUnbound{
+    <#
+    .SYNOPSIS
+    The Write-PFStaticRoute function Prints all the unbound DNSSettings of the PFSense. 
+
+    .DESCRIPTION
+    The Write-PFStaticRoute function Prints all the unbound DNSSettings of the PFSense. 
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsResolver -action print -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
-    Begin{
-        $Object = (New-Object -TypeName "PFdhcpStaticMapWrite")
-    }
+    Begin{}
     process{
         $PFObject = Get-PFUnbound -Server $InputObject
-        $Properties = @{}
-        $Object = New-Object -TypeName "PFUnbound" -Property $Properties
-        foreach($Rule in $PFObject){
-            $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
-                if($Rule.($_.name)){$Properties.($_.name) = $Rule.($_.name)}
-            }
-        }
-        if(-not $Properties.port){$Properties.port = "53"}
-        if(-not $Properties.sslport){$Properties.sslport = "853"}
-        $Object = New-Object -TypeName "PFUnbound" -Property $Properties
-        $Object | format-table *
+        # If the dns default port's are used, these are not in the xml config, we set them to display the correct settings
+        if(-not $PFObject.port){$PFObject.port = "53"}
+        if(-not $PFObject.sslport){$PFObject.sslport = "853"}
+        # Display the settings
+        $PFObject | format-table enable,ActiveInterface,OutgoingInterface,dnssec,port,sslport,CustomOptions,sslcertref
     }
 }
 
 Function Write-PFUnboundHost{
+    <#
+    .SYNOPSIS
+    The Write-PFUnboundHost function Prints all the unbound DNS HostOverride's of the PFSense. 
+
+    .DESCRIPTION
+    The Write-PFUnboundHost function Prints all the unbound DNS HostOverride's of the PFSense. 
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsResolverHost -action print -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
     Begin{
     }
     process{
         $PFObject = get-PFunboundHost -Server $InputObject
-        $exclude = ("")
-        $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
+        $WriteObject = New-Object System.Collections.ArrayList
+        foreach($PFHost in $PFObject){
+            $index = 0
+            $Object = New-Object -TypeName "PFUnboundHost" -Property $Properties
+            $Properties = @{}
+            try{
+                # first we add the first alias to the $writeObject
+                $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                    if($PFHost.$($_.name).gettype() -eq [PFUnboundHostEntry[]]){$Properties.add(($_.name),$PFHost.$($_.name)[$Index])}
+                    else{$Properties.add(($_.name),$PFHost.$($_.name))}
+                }
+                $NewObject = New-Object -TypeName "PFUnboundHost" -Property $Properties 
+                $WriteObject.add($NewObject) | out-null
+                # Now we add one to the index to add all the other aliases to the writeobject
+                $index++
+                $Properties = @{}
+                while($PFHost.Alias[$index]){
+                    $Properties.Alias = $PFHost.Alias[$Index]
+                    $NewObject = New-Object -TypeName "PFUnboundHost" -Property $Properties 
+                    $WriteObject.add($NewObject) | out-null
+                    $index++
+                }
+            }
+            catch{$WriteObject.add($PFHost) | out-null}
+        }
+        $WriteObject | Format-table Hostname,Domain,Address,Description,Alias
     }
 }
+
+
+Function Write-PFUnboundDomain{
+    <#
+    .SYNOPSIS
+    The Write-PFUnboundDomain function Prints all the unbound DNS Domain Override's of the PFSense. 
+
+    .DESCRIPTION
+    The Write-PFUnboundDomain function Prints all the unbound DNS Domain Override's of the PFSense.
+    This page is used to specify domains for which the resolver's standard DNS lookup process will be overridden,
+    and the resolver will query a different (non-standard) lookup server instead. 
+    It is possible to enter 'non-standard', 'invalid' and 'local' domains such as 'test', 'mycompany.localdomain', or '1.168.192.in-addr.arpa', 
+    as well as usual publicly resolvable domains such as 'org', 'info', or 'google.co.uk'. 
+    The IP address entered will be treated as the IP address of an authoritative lookup server for the domain (including all of its subdomains), 
+    and other lookup servers will not be queried.
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsResolverDomain -action print -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+    }
+    process{
+        $PFObject = get-PFunboundDomain -Server $InputObject
+        $PFObject | Format-table Domain,Address,TLSQueries,TlsHostname,Description
+    }
+}
+
+
+Function add-PFUnboundHost{
+    <#
+    .SYNOPSIS
+    add-PFUnboundHost Function add's a host to the unbound deamon
+
+    .DESCRIPTION
+    add-PFUnboundHost Function add's a host to the unbound deamon
+
+    .PARAMETER HostName
+    HostName
+
+    .PARAMETER Domain
+    Domain
+
+    .PARAMETER Address
+    Address
+    
+    .PARAMETER Description
+    Description
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsResolverHost -action add -Hostname XMLRPC -Domain EU -Address 192.168.0.28 -Description This is a xmlrpc test entry -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$True, HelpMessage='Hostname')] [string] $HostName,
+        [Parameter(Mandatory=$True, HelpMessage='The Domain')] [string] $Domain,
+        [Parameter(Mandatory=$false, HelpMessage='Address')] [string] $Address,
+        [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Description
+    )
+    Begin{
+        $Object = (New-Object -TypeName "PFUnboundHost")
+    }
+    process{
+        $PFObject = Get-PFunboundHost -Server $InputObject
+        # Test UserInput
+        foreach($hostoverride in $PFObject){
+            if(($hostoverride.Hostname -eq $HostName) -and ($hostoverride.Domain -eq $domain)){
+                Throw "This host/domain override combination already exists with an IP address."
+            }
+        }
+        try{[ipaddress]$testIpAddress = $Address}
+        catch{ throw "{0}" -f $_ }
+        <# Find a way to check the characters #>
+        if(($HostName.StartsWith("-")) -or ($HostName.EndsWith("-")) <# Find a way to check the characters #>){throw "The hostname can only contain the characters A-Z, 0-9, '_' and '-'. It may not start or end with '-'."}
+
+        # Create a new Object
+        $alias = @{} # if we do not set alias to a hashtable, it will crash the creation of NewObject, it does expect $alias to be a hashtable
+        $Properties = @{}
+        $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                $Properties.add($_.name,$(get-variable $_.name -valueOnly -ErrorAction Ignore)) # The -erroraction Ignore is used because not all properties are variable's 
+        }
+        $NewObject = New-Object -TypeName "PFUnboundHost" -Property $Properties
+        $PFObject += $NewObject
+        Set-PFUnboundHost -InputObject $PFserver -NewObject $PFObject
+    }
+}
+
+
+Function add-PFUnboundHostAlias{
+    <#
+    .SYNOPSIS
+    add-PFUnboundHostAlias Function add's a alias to a host of the unbound deamon
+
+    .DESCRIPTION
+    add-PFUnboundHostAlias Function add's a alias to a host of the unbound deamon
+
+    .PARAMETER HostName
+    HostName
+
+    .PARAMETER Domain
+    Domain
+
+    .PARAMETER HostNameAlias / _AliasesHost
+    Hostname of the Alias
+
+    .PARAMETER DomainAlias / _AliasesDomain
+    The Domain of the Alias
+
+    .PARAMETER DescriptionAlias / _AliasesDescription
+    The Description of the Alias
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsResolverHost -action AliasAdd -Hostname one_host_override -Domain nl -HostNameAlias xmlrpcAlias -DomainAlias DE -DescriptionAlias 'To add a alias true xmlrpc' -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$True, HelpMessage='Hostname')] [string] $HostName,
+        [Parameter(Mandatory=$True, HelpMessage='Hostname of the Alias')][Alias('HostNameAlias')] [string]$_AliasesHost,
+        [Parameter(Mandatory=$True, HelpMessage='The Domain')] [string] $Domain,
+        [Parameter(Mandatory=$True, HelpMessage='The Domain of the Alias')][Alias('DomainAlias')] [string]$_AliasesDomain,
+        [Parameter(Mandatory=$false, HelpMessage='The Description of the Alias')][Alias('DescriptionAlias')] [string]$_AliasesDescription
+    )
+    Begin{
+        $Object = (New-Object -TypeName "PFUnboundHostEntry")
+    }
+    process{
+        $PFObject = Get-PFunboundHost -Server $InputObject
+        # Test UserInput
+        $ThrowError = $true
+        foreach($hostoverride in $PFObject){
+            if(($hostoverride.Hostname -eq $HostName) -and ($hostoverride.Domain -eq $domain)){
+                $ThrowError = $false
+            }
+        }
+        if($ThrowError){Throw "This host/domain override combination could not be found. please check or add instead."}
+        # Create a new PFUnboundHostEntry Object
+        $Properties = @{}
+        $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                $Properties.add($_.name,$(get-variable $_.name -valueOnly -ErrorAction Ignore)) # The -erroraction Ignore is used because not all properties are variable's 
+        }
+        $alias = New-Object -TypeName "PFUnboundHostEntry" -Property $Properties
+
+        foreach($hostoverride in $PFObject){
+            if(($hostoverride.Hostname -eq $HostName) -and ($hostoverride.Domain -eq $domain)){
+                $hostoverride.alias += $alias
+            }
+        }
+        Set-PFUnboundHost -InputObject $PFserver -NewObject $PFObject
+    }
+}
+
+Function add-PFUnboundDomain{
+    <#
+    .SYNOPSIS
+    add-PFUnboundDomain Function add's a Domain override to the unbound deamon
+
+    .DESCRIPTION
+    add-PFUnboundDomain Function add's a Domain override to the unbound deamon.
+    This page is used to specify domains for which the resolver's standard DNS lookup process will be overridden,
+    and the resolver will query a different (non-standard) lookup server instead. 
+    It is possible to enter 'non-standard', 'invalid' and 'local' domains such as 'test', 'mycompany.localdomain', or '1.168.192.in-addr.arpa', 
+    as well as usual publicly resolvable domains such as 'org', 'info', or 'google.co.uk'. 
+    The IP address entered will be treated as the IP address of an authoritative lookup server for the domain (including all of its subdomains), 
+    and other lookup servers will not be queried.
+    
+    .PARAMETER Domain
+    Domain whose lookups will be directed to a user-specified DNS lookup server.
+
+    .PARAMETER Address
+    IPv4 or IPv6 address of the authoritative DNS server for this domain. e.g.: 192.168.100.100
+    To use a non-default port for communication, append an '@' with the port number.
+    
+    .PARAMETER TLSQueries
+    When set, queries to all DNS servers for this domain will be sent using SSL/TLS on the default port of 853.
+
+    .PARAMETER TlsHostname
+    An optional TLS hostname used to verify the server certificate when performing TLS Queries.
+
+    .PARAMETER Description
+    A description may be entered here for administrative reference (not parsed)
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsResolverDomain -action add -Domain EU -Address 192.168.0.2888 -TLSQueries $True -TlsHostname TestServer -Description 'This is a xmlrpc test entry' -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$True, HelpMessage='Domain whose lookups will be directed to a user-specified DNS lookup server.')] [string] $Domain,
+        [Parameter(Mandatory=$True, HelpMessage='IPv4 or IPv6 address of the authoritative DNS server for this domain. e.g.: 192.168.100.100 To use a non-default port for communication, append an "@" with the port number.')] [string] $Address,
+        [Parameter(Mandatory=$false, HelpMessage='When set, queries to all DNS servers for this domain will be sent using SSL/TLS on the default port of 853.')] [Bool] $TLSQueries,
+        [Parameter(Mandatory=$false, HelpMessage='An optional TLS hostname used to verify the server certificate when performing TLS Queries.')] [string] $TlsHostname,
+        [Parameter(Mandatory=$false, HelpMessage='A description may be entered here for administrative reference (not parsed).')] [string] $Description
+    )
+    Begin{
+        $Object = (New-Object -TypeName "PFUnboundDomain")
+    }
+    process{
+        $PFObject = Get-PFunboundDomain -Server $InputObject
+        # Test UserInput
+        if($Address -match "@"){
+            [ipaddress]$testIpAddress = $Address.split("@")[0]
+            [int64]$port = $Address.split("@")[1]
+            if($port -gt 65535) {throw "A valid IP address and port must be specified, for example 192.168.100.10@5353."}
+        }
+        else{[ipaddress]$testIpAddress = $Address.split("@")[0]}
+
+        <# Find a way to check the characters #>
+        if(($Domain.StartsWith("-")) -or ($Domain.EndsWith("-")) <# Find a way to check the characters #>){throw "The hostname can only contain the characters A-Z, 0-9, '_' and '-'. It may not start or end with '-'."}
+
+        # Create a new Object
+        $Properties = @{}
+        $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                $Properties.add($_.name,$(get-variable $_.name -valueOnly -ErrorAction Ignore)) # The -erroraction Ignore is used because not all properties are variable's 
+        }
+        $NewObject = New-Object -TypeName "PFUnboundDomain" -Property $Properties
+        $PFObject += $NewObject
+        Set-PFUnboundDomain -InputObject $PFserver -NewObject $PFObject
+    }
+}
+
+Function Delete-PFUnboundDomain{
+    <#
+    .SYNOPSIS
+    The Delete-PFUnboundDomain function Delete's a dns override zone on the unbound DNS Deamon of the PFSense.
+
+    .DESCRIPTION
+    The Delete-PFUnboundDomain function Delete's a dns override zone on the unbound DNS Deamon of the PFSense.
+
+    .PARAMETER Domain
+    Domain
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsResolverDomain -action Delete -Domain domainoverride -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$True, HelpMessage='The Domain')] [string] $Domain
+    )
+    Begin{}
+    process{
+        $PFObject = Get-PFunboundDomain -Server $InputObject
+        # Test UserInput
+        if($Domain -NotIn $PFObject.domain){Throw "This DomainOverride: {0}  could not be found." -f $Domain}
+        # Create new PFObject 
+        $PFObject = $PFObject | Where-Object {($_.Domain -ne $Domain)}
+        Set-PFUnboundDomain -InputObject $PFserver -NewObject $PFObject
+    }
+}
+
+Function Delete-PFUnboundHost{
+    <#
+    .SYNOPSIS
+    The Edit-PFUnboundHost function Edit's a unbound host on the PFSense.
+
+    .DESCRIPTION
+    The Edit-PFUnboundHost function Edit's a unbound host on the PFSense.
+
+    .PARAMETER HostName
+    HostName
+
+    .PARAMETER Domain
+    Domain
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsResolverHost -action Delete -Hostname one_host_override  -Domain nl -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$True, HelpMessage='Hostname')] [string] $HostName,
+        [Parameter(Mandatory=$True, HelpMessage='The Domain')] [string] $Domain
+    )
+    Begin{
+        $Object = (New-Object -TypeName "PFUnboundHost")
+    }
+    process{
+        $PFObject = Get-PFunboundHost -Server $InputObject
+        # Test UserInput
+        $ThrowError = $true
+        foreach($hostoverride in $PFObject){
+            if(($hostoverride.Hostname -eq $HostName) -and ($hostoverride.Domain -eq $domain)){
+                $ThrowError = $false
+            }
+        }
+        if($ThrowError){Throw "This host/domain override combination could not be found. please check or add instead."}
+        # Create new PFObject 
+        $PFObject = $PFObject | Where-Object {($_.Hostname -ne $HostName) -or ($_.Domain -ne $Domain)}
+        Set-PFUnboundHost -InputObject $PFserver -NewObject $PFObject
+    }
+}
+
+Function Delete-PFUnboundHostAlias{
+    <#
+    .SYNOPSIS
+    add-PFUnboundHostAlias Function add's a alias to a host of the unbound deamon
+
+    .DESCRIPTION
+    add-PFUnboundHostAlias Function add's a alias to a host of the unbound deamon
+
+    .PARAMETER HostName
+    HostName
+
+    .PARAMETER Domain
+    Domain
+
+    .PARAMETER HostNameAlias / _AliasesHost
+    Hostname of the Alias
+
+    .PARAMETER DomainAlias / _AliasesDomain
+    The Domain of the Alias
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsResolverHost -action AliasDelete -Hostname host_override_with_alias -Domain com -HostNameAlias aliashost_1 -DomainAlias com -DescriptionAlias 'To add a alias true xmlrpc' -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$True, HelpMessage='Hostname')] [string] $HostName,
+        [Parameter(Mandatory=$True, HelpMessage='Hostname of the Alias')][Alias('HostNameAlias')] [string]$_AliasesHost,
+        [Parameter(Mandatory=$True, HelpMessage='The Domain')] [string] $Domain,
+        [Parameter(Mandatory=$True, HelpMessage='The Domain of the Alias')][Alias('DomainAlias')] [string]$_AliasesDomain
+    )
+    Begin{
+        $Object = (New-Object -TypeName "PFUnboundHostEntry")
+    }
+    process{
+        $PFObject = Get-PFunboundHost -Server $InputObject
+        # Test UserInput
+        $ThrowErrorHost = $true
+        $ThrowErrorAlias = $true
+        foreach($hostoverride in $PFObject){
+            if(($hostoverride.Hostname -eq $HostName) -and ($hostoverride.Domain -eq $domain)){
+                $ThrowErrorHost = $false
+                foreach($Alias in $hostoverride.alias){
+                    if(($Alias._AliasesHost -eq $_AliasesHost) -and ($Alias._AliasesDomain -eq $_AliasesDomain)){
+                        $ThrowErrorAlias = $false
+                    }
+                }
+            }
+        }
+        if($ThrowErrorHost){Throw "This host/domain override combination could not be found. please check or add instead."}
+        if($ThrowErrorAlias){Throw "The Alias could not be found."}
+        # Delete the alias entry
+        foreach($hostoverride in $PFObject){
+            if(($hostoverride.Hostname -eq $HostName) -and ($hostoverride.Domain -eq $domain)){
+                $hostoverride.alias = $hostoverride.alias | Where-Object {($_._AliasesHost -ne $_AliasesHost) -or ($_._AliasesDomain -ne $_AliasesDomain)}
+            }
+        }
+        Set-PFUnboundHost -InputObject $PFserver -NewObject $PFObject
+    }
+}
+
+Function Edit-PFUnboundDomain{
+    <#
+    .SYNOPSIS
+    add-PFUnboundDomain Function add's a Domain override to the unbound deamon
+
+    .DESCRIPTION
+    add-PFUnboundDomain Function add's a Domain override to the unbound deamon.
+    This page is used to specify domains for which the resolver's standard DNS lookup process will be overridden,
+    and the resolver will query a different (non-standard) lookup server instead. 
+    It is possible to enter 'non-standard', 'invalid' and 'local' domains such as 'test', 'mycompany.localdomain', or '1.168.192.in-addr.arpa', 
+    as well as usual publicly resolvable domains such as 'org', 'info', or 'google.co.uk'. 
+    The IP address entered will be treated as the IP address of an authoritative lookup server for the domain (including all of its subdomains), 
+    and other lookup servers will not be queried.
+    
+    .PARAMETER Domain
+    Domain whose lookups will be directed to a user-specified DNS lookup server.
+
+    .PARAMETER Address
+    IPv4 or IPv6 address of the authoritative DNS server for this domain. e.g.: 192.168.100.100
+    To use a non-default port for communication, append an '@' with the port number.
+    
+    .PARAMETER TLSQueries
+    When set, queries to all DNS servers for this domain will be sent using SSL/TLS on the default port of 853.
+
+    .PARAMETER TlsHostname
+    An optional TLS hostname used to verify the server certificate when performing TLS Queries.
+
+    .PARAMETER Description
+    A description may be entered here for administrative reference (not parsed)
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsResolverDomain -action add -Domain EU -Address 192.168.0.2888 -TLSQueries $True -TlsHostname TestServer -Description 'This is a xmlrpc test entry' -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$True, HelpMessage='Domain whose lookups will be directed to a user-specified DNS lookup server.')] [string] $Domain,
+        [Parameter(Mandatory=$false, HelpMessage='IPv4 or IPv6 address of the authoritative DNS server for this domain. e.g.: 192.168.100.100 To use a non-default port for communication, append an "@" with the port number.')] [string] $Address,
+        [Parameter(Mandatory=$false, HelpMessage='When set, queries to all DNS servers for this domain will be sent using SSL/TLS on the default port of 853.')] [Bool] $TLSQueries,
+        [Parameter(Mandatory=$false, HelpMessage='An optional TLS hostname used to verify the server certificate when performing TLS Queries.')] [string] $TlsHostname,
+        [Parameter(Mandatory=$false, HelpMessage='A description may be entered here for administrative reference (not parsed).')] [string] $Description
+    )
+    Begin{
+        $Object = (New-Object -TypeName "PFUnboundDomain")
+    }
+    process{
+        $PFObject = Get-PFunboundDomain -Server $InputObject
+        # Test UserInput
+            if($address){
+            if($Address -match "@"){
+                [ipaddress]$testIpAddress = $Address.split("@")[0]
+                [int64]$port = $Address.split("@")[1]
+                if($port -gt 65535) {throw "A valid IP address and port must be specified, for example 192.168.100.10@5353."}
+            }
+            else{[ipaddress]$testIpAddress = $Address.split("@")[0]}
+        }
+
+        <# Find a way to check the characters #>
+        if(($Domain.StartsWith("-")) -or ($Domain.EndsWith("-")) <# Find a way to check the characters #>){throw "The hostname can only contain the characters A-Z, 0-9, '_' and '-'. It may not start or end with '-'."}
+
+        #check if domain excists, other throw error and exit
+        if($domain -NotIn $PFObject.domain){
+            throw {"Could not find domain {0}, please check input or add instead" -f $domain} 
+        }
+
+        # Edit the Object with the same Domain
+        $WorkingObject = $PFObject | Where-Object {$_.domain -eq $domain}
+        $WorkingObject | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+            # Only set if variable is set
+            if(-not [string]::IsNullOrWhiteSpace($(get-variable $_.name -valueOnly -ErrorAction Ignore))){ # Only set object if variable is set. don't override with empty value's
+                $WorkingObject.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
+            }
+        }
+        
+        Set-PFUnboundDomain -InputObject $PFserver -NewObject $PFObject
+    }
+}
+Function Edit-PFUnboundHost{
+    <#
+    .SYNOPSIS
+    The Edit-PFUnboundHost function Edit's a unbound host on the PFSense.
+
+    .DESCRIPTION
+    The Edit-PFUnboundHost function Edit's a unbound host on the PFSense.
+
+    .PARAMETER HostName
+    HostName
+
+    .PARAMETER Domain
+    Domain
+
+    .PARAMETER Address
+    Address
+    
+    .PARAMETER Description
+    Description
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsResolverHost -action Edit -Hostname host_override_with_alias -Domain com -Address 1.2.3.4 -Description This is a xmlrpc test entry -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$True, HelpMessage='Hostname')] [string] $HostName,
+        [Parameter(Mandatory=$True, HelpMessage='The Domain')] [string] $Domain,
+        [Parameter(Mandatory=$false, HelpMessage='Address')] [string] $Address,
+        [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Description
+    )
+    Begin{
+        $Object = (New-Object -TypeName "PFUnboundHost")
+    }
+    process{
+        $PFObject = Get-PFunboundHost -Server $InputObject
+        # Test UserInput
+        $ThrowError = $true
+        foreach($hostoverride in $PFObject){
+            if(($hostoverride.Hostname -eq $HostName) -and ($hostoverride.Domain -eq $domain)){
+                $ThrowError = $false
+            }
+        }
+        if($ThrowError){Throw "This host/domain override combination could not be found. please check or add instead."}
+
+
+        try{[ipaddress]$testIpAddress = $Address}
+        catch{ throw "{0}" -f $_ }
+        <# Find a way to check the characters #>
+        # Create a new Object
+        foreach($hostoverride in $PFObject){
+            if(($hostoverride.Hostname -eq $HostName) -and ($hostoverride.Domain -eq $domain)){
+                $hostoverride | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                    # Only set if variable is set
+                    if(-not [string]::IsNullOrWhiteSpace($(get-variable $_.name -valueOnly -ErrorAction Ignore))){ # Only set object if variable is set. don't override with empty value's
+                    $hostoverride.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
+                    }
+                }
+            }
+        }
+        Set-PFUnboundHost -InputObject $PFserver -NewObject $PFObject
+    }
+}
+
+Function Add-PFVlan{
+    <#
+    .SYNOPSIS
+    The Add-PFVlan function Add's a vlan on the PFSense. 
+
+    .DESCRIPTION
+    The Add-PFVlan function Add's a vlan on the PFSense.  
+
+    .parameter interface
+    VLAN capable interface
+
+    .parameter Tag
+    802.1Q VLAN tag (between 1 and 4094).
+
+    .parameter Priority
+    802.1Q VLAN Priority (between 0 and 7).
+
+    .parameter Description
+    A group description may be entered here for administrative reference (not parsed).
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service vlan -action Add -interface em2 -Tag 151 -Priority 3 -Description 'This is a XML RPC Test' -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$false, HelpMessage='VLAN capable interface')][string]$interface,
+        [Parameter(Mandatory=$false, HelpMessage='802.1Q VLAN tag (between 1 and 4094).')][int]$Tag,
+        [Parameter(Mandatory=$false, HelpMessage='802.1Q VLAN Priority (between 0 and 7).')][int]$Priority,
+        [Parameter(Mandatory=$false, HelpMessage='A group description may be entered here for administrative reference (not parsed).')][string]$Description
+        )
+    Begin{
+    }
+    process{
+        # Get excisiting vlan's and Interfaces
+        $VlanObject = get-PFVlan -Server $InputObject
+        $InterfaceObject = get-pfinterface -Server $InputObject
+        # Check UserInput
+        if(($tag -gt 4094) -or ($tag -lt 1)){throw "The 802.1Q VLAN tag must be between 1 and 4094"}
+        if(($Priority -gt 7) -or ($Priority -lt 0)){throw "The 802.1Q VLAN Priority must be between 0 and 7"}
+        if($interface -NotIn $InterfaceObject.Interface){Throw "Could not find Interface {0}. please use the Physical interface name like em0" -f $Interface}
+        foreach($Vlan in $VlanObject){
+            if(($interface -eq $vlan.interface) -and ($tag -eq $vlan.Tag)){Throw "Interface {0} already has a vlan with tag {1}" -f $interface,$tag}
+        }
+        # create vlanif variable
+        $vlanif = "{0}.{1}" -f $interface,$tag
+        # Create a new Object
+        $Object = New-Object -TypeName "PFVlan" 
+        $Properties = @{}
+        $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                $Properties.add($_.name,$(get-variable $_.name -valueOnly -ErrorAction Ignore)) # The -erroraction Ignore is used because not all properties are variable's 
+        }
+        $NewObject = New-Object -TypeName "PFVlan" -Property $Properties
+        $VlanObject += $NewObject
+        set-pfvlan -InputObject $PFserver -NewObject $VlanObject
+    }
+}
+
+Function Delete-PFVlan{
+    <#
+    .SYNOPSIS
+    The Delete-PFVlan function deletes a vlan on the PFSense. 
+
+    .DESCRIPTION
+    The Delete-PFVlan function deletes a vlan on the PFSense. 
+
+    .parameter interface
+    VLAN capable interface
+
+    .parameter Tag
+    802.1Q VLAN tag (between 1 and 4094).
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service vlan -action Delete -interface em2 -Tag 150 -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$false, HelpMessage='VLAN capable interface')][string]$interface,
+        [Parameter(Mandatory=$false, HelpMessage='802.1Q VLAN tag (between 1 and 4094).')][int]$Tag
+        )
+    Begin{
+    }
+    process{
+        # Get excisiting vlan's and Interfaces
+        $VlanObject = get-PFVlan -Server $InputObject
+        # Check UserInput
+        if(($tag -gt 4094) -or ($tag -lt 1)){throw "The 802.1Q VLAN tag must be between 1 and 4094"}
+        $throwError = $true
+        foreach($Vlan in $VlanObject){
+            if(($interface -eq $vlan.interface) -and ($tag -eq $vlan.Tag)){$throwError = $false}
+        }
+        if($throwError){Throw "could not find a vlan with tag {0} on Interface {1} " -f $tag,$interface}
+        # Delete the VlanObject from the array
+        $VlanObject = $VlanObject | Where-Object {($_.interface -ne $interface) -or ($_.tag -ne $tag)}
+        set-pfvlan -InputObject $PFserver -NewObject $VlanObject
+    }
+}
+
 Function Write-PFVlan{
+    <#
+    .SYNOPSIS
+    The Write-PFVlan function Prints all the vlan's of the PFSense. 
+
+    .DESCRIPTION
+    The Write-PFVlan function Prints all the vlan's of the PFSense. 
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service vlan -action print -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
     Begin{
     }
     process{
         $PFObject = get-PFVlan -Server $InputObject
-        $exclude = ("vlanif")
-        $PFObject | Select-Object -ExcludeProperty $exclude | Format-table *
+        $PFObject | Format-table Interface,Tag,Priority,Description
     }
 }
 
@@ -1816,7 +2924,7 @@ try{
     if(-not $Flow.ContainsKey($Service)){  Write-Host "Unknown service '$Service'" -ForegroundColor red; exit 2 }
     if(-not $Flow.$Service.ContainsKey($Action)){ Write-Host "Unknown action '$Action' for service '$Service'" -ForegroundColor red; exit 3 }
 
-    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer,$path,$file,$Network,$Gateway,$Description,$Interface,$From,$To,$netmask,$Domain,$DNSServer,$NTPServer,$Alias,$Type,$Address,$Detail,$HostName,$ClientID,$MacAddr,$Protocol,$SourceAddress,$DestAddress,$DestPort,$NatIp,$NatPort,$Weight,$Monitor,$Name,$IpProtocol,$IsLogged,$IsQuick,$IsFloating,$tracker,$OldLineNumber,$NewLineNumber
+    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer,$path,$file,$Network,$Gateway,$Description,$Interface,$From,$To,$netmask,$Domain,$DNSServer,$NTPServer,$Alias,$Type,$Address,$Detail,$HostName,$ClientID,$MacAddr,$Protocol,$SourceAddress,$DestAddress,$DestPort,$NatIp,$NatPort,$Weight,$Monitor,$Name,$IpProtocol,$IsLogged,$IsQuick,$IsFloating,$tracker,$OldLineNumber,$NewLineNumber,$IPv4Address,$IPv4Subnet,$IPv4Gateway,$IPv6Address,$IPv6Subnet,$IPv6Gateway,$blockpriv,$BlockBogons,$ActiveInt,$OutgoingInterface,$dnssec,$sslport,$CustomOptions,$sslcertref,$port,$HostNameAlias,$DomainAlias,$DescriptionAlias,$TLSQueries,$TlsHostname,$Tag,$Priority
  
 } catch { 
     Write-Error $_.Exception.Message

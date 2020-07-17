@@ -156,8 +156,20 @@ class PFDnsMasq{
     }
 }
 
+class PFDnsMasqDomain {
+    [string]$Domain
+    [string]$Address
+    [string]$Description
+
+    static [string]$Section = "dnsmasq/domainoverrides"
+    static $PropertyMapping = @{ 
+        Address = "IP"
+        Description = "descr"
+    }
+}
+
 class PFDnsMasqHost{
-    [PFDnsMasqHostEntry[]]$Alias
+    [PFDnsHostEntry[]]$Alias
     [string]$Description
     [string]$domain
     [string]$Hostname
@@ -165,6 +177,7 @@ class PFDnsMasqHost{
     [string[]]$_AliasesDescription
     [string[]]$_AliasesDomain
     [string[]]$_AliasesHost
+    $aliases # If aliases is set to [hashtable[]] and it is empty, it crashes the script
 
     static [string]$Section = "dnsmasq/hosts"
     # property name as it appears in the XML, insofar it's different from the object's property name
@@ -178,7 +191,7 @@ class PFDnsMasqHost{
     }
 }
 
-class PFDnsMasqHostEntry{
+class PFDnsHostEntry{
     [string]$_AliasesHost
     [string]$_AliasesDomain
     [String]$_AliasesDescription
@@ -454,17 +467,6 @@ class PFUnbound {
     }
 }
 
-class PFUnboundHostEntry {
-    [string]$_AliasesHost
-    [string]$_AliasesDomain
-    [String]$_AliasesDescription
-
-    [string] ToString(){
-        return ("{0}.{1}: Description= {2}" -f $this._AliasesHost,$this._AliasesDomain,$this._AliasesDescription)
-    }
-}
-
-
 class PFUnboundHost {
     [string]$Hostname
     [string]$Domain
@@ -473,7 +475,7 @@ class PFUnboundHost {
     [string[]]$_AliasesHost
     [string[]]$_AliasesDomain
     [string[]]$_AliasesDescription
-    [PFUnboundHostEntry[]]$Alias
+    [PFDnsHostEntry[]]$Alias
     $aliases # If aliases is set to [hashtable[]] and it is empty, it crashes the script
 
     static [string]$Section = "unbound/hosts"

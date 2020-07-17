@@ -936,57 +936,6 @@ Function Write-PFDnsMasq{
     }
 }
 
-Function Write-PFDnsMasqHost{
-    <#
-    .SYNOPSIS
-    
-
-    .DESCRIPTION
-    
-  
-    .EXAMPLE
-    
-
-    .LINK
-    https://github.com/RaulGrayskull/PFSense_Powershell
-    
-    #>
-    [CmdletBinding()]
-    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
-    Begin{
-    }
-    process{
-        $PFObject = get-PFDnsMasqhost -Server $InputObject
-        $WriteObject = New-Object System.Collections.ArrayList
-        foreach($PFHost in $PFObject){
-            $index = 0
-            $Object = New-Object -TypeName "PFDnsMasqHost" -Property $Properties
-            $Properties = @{}
-            try{
-                # first we add the first alias to the $writeObject
-                $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
-                    if($PFHost.$($_.name).gettype() -eq [PFDnsMasqHostEntry[]]){$Properties.add(($_.name),$PFHost.$($_.name)[$Index])}
-                    else{$Properties.add(($_.name),$PFHost.$($_.name))}
-                }
-                $NewObject = New-Object -TypeName "PFDnsMasqHost" -Property $Properties 
-                $WriteObject.add($NewObject) | out-null
-                # Now we add one to the index to add all the other aliases to the writeobject
-                $index++
-                $Properties = @{}
-                while($PFHost.Alias[$index]){
-                    $Properties.Alias = $PFHost.Alias[$Index]
-                    $NewObject = New-Object -TypeName "PFDnsMasqHost" -Property $Properties 
-                    $WriteObject.add($NewObject) | out-null
-                    $index++
-                }
-            }
-            catch{$WriteObject.add($PFHost) | out-null}
-        }
-        $WriteObject | Format-table Hostname,Domain,Address,Description,Alias
-    }
-}
-
-
 Function Write-PFDnsMasqCustomOptions {
     <#
     .SYNOPSIS
@@ -1012,6 +961,168 @@ Function Write-PFDnsMasqCustomOptions {
     }
 }
 
+function Add-PFDnsMasqDomain{
+    <#
+    .SYNOPSIS
+
+
+    .DESCRIPTION
+
+    
+    .PARAMETER Domain
+
+
+    .PARAMETER Address
+
+    .PARAMETER Description
+    A description may be entered here for administrative reference (not parsed)
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsResolverDomain -action add -Domain EU -Address 192.168.0.2888 -TLSQueries $True -TlsHostname TestServer -Description 'This is a xmlrpc test entry' -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$True, HelpMessage='.')] [string] $Domain,
+        [Parameter(Mandatory=$True, HelpMessage='.')] [string] $Address,
+        [Parameter(Mandatory=$false, HelpMessage='.')] [string] $Description
+    )
+    Begin{
+        $Object = (New-Object -TypeName "PFDnsMasqDomain")
+    }
+    process{
+        [array]$PFObject = Get-PFDnsMasqDomain -Server $InputObject
+        # Test User Input
+        if($domain -in $PFObject.Domain){
+            Throw "there is already a domain override for domain {0}" -f $domain
+        }
+
+        # Create a new Object
+        $Properties = @{}
+        $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                $Properties.add($_.name,$(get-variable $_.name -valueOnly -ErrorAction Ignore)) # The -erroraction Ignore is used because not all properties are variable's 
+        }
+        $NewObject = New-Object -TypeName "PFDnsMasqDomain" -Property $Properties
+        $PFObject += $NewObject
+        Set-PFDnsMasqDomain -InputObject $PFserver -NewObject $PFObject
+    }
+}
+
+function Delete-PFDnsMasqDomain{
+    <#
+    .SYNOPSIS
+    
+
+    .DESCRIPTION
+    
+
+    .PARAMETER Domain
+    Domain
+
+    .EXAMPLE
+    
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$True, HelpMessage='The Domain')] [string] $Domain
+    )
+    Begin{}
+    process{
+        $PFObject = Get-PFDnsMasqDomain -Server $InputObject
+        # Test UserInput
+        if($Domain -NotIn $PFObject.domain){Throw "This DomainOverride: {0}  could not be found." -f $Domain}
+        # Create new PFObject 
+        $PFObject = $PFObject | Where-Object {($_.Domain -ne $Domain)}
+        Set-PFUnboundDomain -InputObject $PFserver -NewObject $PFObject
+    }
+}
+
+function Edit-PFDnsMasqDomain{
+    <#
+    .SYNOPSIS
+
+    .DESCRIPTION
+
+    
+    .PARAMETER Domain
+
+
+    .PARAMETER Address
+
+    
+    .PARAMETER Description
+    A description may be entered here for administrative reference (not parsed)
+
+    .EXAMPLE
+    
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+   
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$True, HelpMessage='Domain whose lookups will be directed to a user-specified DNS lookup server.')] [string] $Domain,
+        [Parameter(Mandatory=$false, HelpMessage='IPv4 or IPv6 address of the authoritative DNS server for this domain. e.g.: 192.168.100.100 To use a non-default port for communication, append an "@" with the port number.')] [string] $Address,
+        [Parameter(Mandatory=$false, HelpMessage='A description may be entered here for administrative reference (not parsed).')] [string] $Description
+    )
+    Begin{
+        $Object = (New-Object -TypeName "PFDnsMasqDomain")
+    }
+    process{
+        $PFObject = Get-PFDnsMasqDomain -Server $InputObject
+        #check if domain excists, other throw error and exit
+        if($domain -NotIn $PFObject.domain){
+            throw {"Could not find domain {0}, please check input or add instead" -f $domain} 
+        }
+
+        # Edit the Object with the same Domain
+        $WorkingObject = $PFObject | Where-Object {$_.domain -eq $domain}
+        $WorkingObject | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+            # Only set if variable is set
+            if(-not [string]::IsNullOrWhiteSpace($(get-variable $_.name -valueOnly -ErrorAction Ignore))){ # Only set object if variable is set. don't override with empty value's
+                $WorkingObject.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
+            }
+        }
+        
+        Set-PFDnsMasqDomain -InputObject $PFserver -NewObject $PFObject
+    }
+}
+
+Function Write-PFDnsMasqDomain {
+    <#
+    .SYNOPSIS
+    the Write-PFDnsMasqDomain function write's the domain overrides of the dnsmasq / dns forwarder of the pfsense
+
+    .DESCRIPTION
+    the Write-PFDnsMasqDomain function write's the domain overrides of the dnsmasq / dns forwarder of the pfsense
+  
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsForwarderDomain -action print -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+    
+    #>
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+    }
+    process{
+        $PFObject = get-PFDnsMasqDomain -Server $InputObject
+        $PFObject | Format-Table Domain,Address,Description
+    }
+}
 
 
 Function Add-PFFirewall{
@@ -2270,46 +2381,48 @@ Function Write-PFUnbound{
     }
 }
 
-Function Write-PFUnboundHost{
+Function Write-PFDNSHost{
     <#
     .SYNOPSIS
-    The Write-PFUnboundHost function Prints all the unbound DNS HostOverride's of the PFSense. 
+    
 
     .DESCRIPTION
-    The Write-PFUnboundHost function Prints all the unbound DNS HostOverride's of the PFSense. 
+    
 
     .EXAMPLE
-    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsResolverHost -action print -notls
+
 
     .LINK
     https://github.com/RaulGrayskull/PFSense_Powershell
    
     #>
     [CmdletBinding()]
-    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    param ( [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
+            [Parameter(Mandatory=$true)][string]$PFObjectType
+    )
     Begin{
     }
     process{
-        $PFObject = get-PFunboundHost -Server $InputObject
+        $PFObject = get-PFdnsHost -Server $InputObject -PFObjectType $PFObjectType
         $WriteObject = New-Object System.Collections.ArrayList
         foreach($PFHost in $PFObject){
             $index = 0
-            $Object = New-Object -TypeName "PFUnboundHost" -Property $Properties
+            $Object = New-Object -TypeName $PFObjectType -Property $Properties
             $Properties = @{}
             try{
                 # first we add the first alias to the $writeObject
                 $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
-                    if($PFHost.$($_.name).gettype() -eq [PFUnboundHostEntry[]]){$Properties.add(($_.name),$PFHost.$($_.name)[$Index])}
+                    if($PFHost.$($_.name).gettype() -eq [PFDnsHostEntry[]]){$Properties.add(($_.name),$PFHost.$($_.name)[$Index])}
                     else{$Properties.add(($_.name),$PFHost.$($_.name))}
                 }
-                $NewObject = New-Object -TypeName "PFUnboundHost" -Property $Properties 
+                $NewObject = New-Object -TypeName $PFObjectType -Property $Properties 
                 $WriteObject.add($NewObject) | out-null
                 # Now we add one to the index to add all the other aliases to the writeobject
                 $index++
                 $Properties = @{}
                 while($PFHost.Alias[$index]){
                     $Properties.Alias = $PFHost.Alias[$Index]
-                    $NewObject = New-Object -TypeName "PFUnboundHost" -Property $Properties 
+                    $NewObject = New-Object -TypeName $PFObjectType -Property $Properties 
                     $WriteObject.add($NewObject) | out-null
                     $index++
                 }
@@ -2353,7 +2466,7 @@ Function Write-PFUnboundDomain{
 }
 
 
-Function add-PFUnboundHost{
+Function add-PFDNSHost{
     <#
     .SYNOPSIS
     add-PFUnboundHost Function add's a host to the unbound deamon
@@ -2386,13 +2499,15 @@ Function add-PFUnboundHost{
         [Parameter(Mandatory=$True, HelpMessage='Hostname')] [string] $HostName,
         [Parameter(Mandatory=$True, HelpMessage='The Domain')] [string] $Domain,
         [Parameter(Mandatory=$false, HelpMessage='Address')] [string] $Address,
-        [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Description
+        [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Description,
+        [Parameter(Mandatory=$true)][string]$PFObjectType
+
     )
     Begin{
-        $Object = (New-Object -TypeName "PFUnboundHost")
+        $Object = (New-Object -TypeName $PFObjectType)
     }
     process{
-        $PFObject = Get-PFunboundHost -Server $InputObject
+        $PFObject = get-PFdnsHost -Server $InputObject -PFObjectType $PFObjectType
         # Test UserInput
         foreach($hostoverride in $PFObject){
             if(($hostoverride.Hostname -eq $HostName) -and ($hostoverride.Domain -eq $domain)){
@@ -2410,20 +2525,20 @@ Function add-PFUnboundHost{
         $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
                 $Properties.add($_.name,$(get-variable $_.name -valueOnly -ErrorAction Ignore)) # The -erroraction Ignore is used because not all properties are variable's 
         }
-        $NewObject = New-Object -TypeName "PFUnboundHost" -Property $Properties
+        $NewObject = New-Object -TypeName $PFObjectType -Property $Properties
         $PFObject += $NewObject
-        Set-PFUnboundHost -InputObject $PFserver -NewObject $PFObject
+        Set-PFDNSHost -InputObject $PFserver -NewObject $PFObject -PFObjectType $PFObjectType
     }
 }
 
 
-Function add-PFUnboundHostAlias{
+Function add-PFDNSHostAlias{
     <#
     .SYNOPSIS
-    add-PFUnboundHostAlias Function add's a alias to a host of the unbound deamon
+    
 
     .DESCRIPTION
-    add-PFUnboundHostAlias Function add's a alias to a host of the unbound deamon
+    
 
     .PARAMETER HostName
     HostName
@@ -2454,13 +2569,14 @@ Function add-PFUnboundHostAlias{
         [Parameter(Mandatory=$True, HelpMessage='Hostname of the Alias')][Alias('HostNameAlias')] [string]$_AliasesHost,
         [Parameter(Mandatory=$True, HelpMessage='The Domain')] [string] $Domain,
         [Parameter(Mandatory=$True, HelpMessage='The Domain of the Alias')][Alias('DomainAlias')] [string]$_AliasesDomain,
-        [Parameter(Mandatory=$false, HelpMessage='The Description of the Alias')][Alias('DescriptionAlias')] [string]$_AliasesDescription
+        [Parameter(Mandatory=$false, HelpMessage='The Description of the Alias')][Alias('DescriptionAlias')] [string]$_AliasesDescription,
+        [Parameter(Mandatory=$True)] [string] $PFObjectType
     )
     Begin{
-        $Object = (New-Object -TypeName "PFUnboundHostEntry")
+        $Object = (New-Object -TypeName "PFDnsHostEntry")
     }
     process{
-        $PFObject = Get-PFunboundHost -Server $InputObject
+        $PFObject = Get-PFdnsHost -Server $InputObject -PFObjectType $PFObjectType
         # Test UserInput
         $ThrowError = $true
         foreach($hostoverride in $PFObject){
@@ -2474,14 +2590,14 @@ Function add-PFUnboundHostAlias{
         $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
                 $Properties.add($_.name,$(get-variable $_.name -valueOnly -ErrorAction Ignore)) # The -erroraction Ignore is used because not all properties are variable's 
         }
-        $alias = New-Object -TypeName "PFUnboundHostEntry" -Property $Properties
+        $alias = New-Object -TypeName "PFDnsHostEntry" -Property $Properties
 
         foreach($hostoverride in $PFObject){
             if(($hostoverride.Hostname -eq $HostName) -and ($hostoverride.Domain -eq $domain)){
                 $hostoverride.alias += $alias
             }
         }
-        Set-PFUnboundHost -InputObject $PFserver -NewObject $PFObject
+        Set-PFdnsHost -InputObject $PFserver -NewObject $PFObject -PFObjectType $PFObjectType
     }
 }
 
@@ -2535,7 +2651,7 @@ Function add-PFUnboundDomain{
         $Object = (New-Object -TypeName "PFUnboundDomain")
     }
     process{
-        $PFObject = Get-PFunboundDomain -Server $InputObject
+        [array]$PFObject = Get-PFunboundDomain -Server $InputObject
         # Test UserInput
         if($Address -match "@"){
             [ipaddress]$testIpAddress = $Address.split("@")[0]
@@ -2592,13 +2708,13 @@ Function Delete-PFUnboundDomain{
     }
 }
 
-Function Delete-PFUnboundHost{
+Function Delete-PFDNSHost{
     <#
     .SYNOPSIS
-    The Edit-PFUnboundHost function Edit's a unbound host on the PFSense.
+
 
     .DESCRIPTION
-    The Edit-PFUnboundHost function Edit's a unbound host on the PFSense.
+
 
     .PARAMETER HostName
     HostName
@@ -2617,13 +2733,14 @@ Function Delete-PFUnboundHost{
     param (
         [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
         [Parameter(Mandatory=$True, HelpMessage='Hostname')] [string] $HostName,
-        [Parameter(Mandatory=$True, HelpMessage='The Domain')] [string] $Domain
+        [Parameter(Mandatory=$True, HelpMessage='The Domain')] [string] $Domain,
+        [Parameter(Mandatory=$True)] [string] $PFObjectType
     )
     Begin{
-        $Object = (New-Object -TypeName "PFUnboundHost")
+        $Object = (New-Object -TypeName $PFObjectType)
     }
     process{
-        $PFObject = Get-PFunboundHost -Server $InputObject
+        $PFObject = Get-PFDNSHost -Server $InputObject -PFObjectType $PFObjectType
         # Test UserInput
         $ThrowError = $true
         foreach($hostoverride in $PFObject){
@@ -2634,17 +2751,17 @@ Function Delete-PFUnboundHost{
         if($ThrowError){Throw "This host/domain override combination could not be found. please check or add instead."}
         # Create new PFObject 
         $PFObject = $PFObject | Where-Object {($_.Hostname -ne $HostName) -or ($_.Domain -ne $Domain)}
-        Set-PFUnboundHost -InputObject $PFserver -NewObject $PFObject
+        Set-PFDNSHost -InputObject $PFserver -NewObject $PFObject -PFObjectType $PFObjectType
     }
 }
 
-Function Delete-PFUnboundHostAlias{
+Function Delete-PFDNSHostAlias{
     <#
     .SYNOPSIS
-    add-PFUnboundHostAlias Function add's a alias to a host of the unbound deamon
+    
 
     .DESCRIPTION
-    add-PFUnboundHostAlias Function add's a alias to a host of the unbound deamon
+    
 
     .PARAMETER HostName
     HostName
@@ -2659,7 +2776,7 @@ Function Delete-PFUnboundHostAlias{
     The Domain of the Alias
 
     .EXAMPLE
-    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsResolverHost -action AliasDelete -Hostname host_override_with_alias -Domain com -HostNameAlias aliashost_1 -DomainAlias com -DescriptionAlias 'To add a alias true xmlrpc' -notls
+
 
     .LINK
     https://github.com/RaulGrayskull/PFSense_Powershell
@@ -2671,13 +2788,14 @@ Function Delete-PFUnboundHostAlias{
         [Parameter(Mandatory=$True, HelpMessage='Hostname')] [string] $HostName,
         [Parameter(Mandatory=$True, HelpMessage='Hostname of the Alias')][Alias('HostNameAlias')] [string]$_AliasesHost,
         [Parameter(Mandatory=$True, HelpMessage='The Domain')] [string] $Domain,
-        [Parameter(Mandatory=$True, HelpMessage='The Domain of the Alias')][Alias('DomainAlias')] [string]$_AliasesDomain
+        [Parameter(Mandatory=$True, HelpMessage='The Domain of the Alias')][Alias('DomainAlias')] [string]$_AliasesDomain,
+        [Parameter(Mandatory=$True)] [string] $PFObjectType
     )
     Begin{
-        $Object = (New-Object -TypeName "PFUnboundHostEntry")
+        $Object = (New-Object -TypeName "PFDNSHostEntry")
     }
     process{
-        $PFObject = Get-PFunboundHost -Server $InputObject
+        $PFObject = Get-PFDNSHost -Server $InputObject -PFObjectType $PFObjectType
         # Test UserInput
         $ThrowErrorHost = $true
         $ThrowErrorAlias = $true
@@ -2699,7 +2817,7 @@ Function Delete-PFUnboundHostAlias{
                 $hostoverride.alias = $hostoverride.alias | Where-Object {($_._AliasesHost -ne $_AliasesHost) -or ($_._AliasesDomain -ne $_AliasesDomain)}
             }
         }
-        Set-PFUnboundHost -InputObject $PFserver -NewObject $PFObject
+        Set-PFdnsHost -InputObject $PFserver -NewObject $PFObject -PFObjectType $PFObjectType
     }
 }
 
@@ -2784,13 +2902,13 @@ Function Edit-PFUnboundDomain{
         Set-PFUnboundDomain -InputObject $PFserver -NewObject $PFObject
     }
 }
-Function Edit-PFUnboundHost{
+Function Edit-PFdnsHost{
     <#
     .SYNOPSIS
-    The Edit-PFUnboundHost function Edit's a unbound host on the PFSense.
+    
 
     .DESCRIPTION
-    The Edit-PFUnboundHost function Edit's a unbound host on the PFSense.
+    
 
     .PARAMETER HostName
     HostName
@@ -2817,13 +2935,14 @@ Function Edit-PFUnboundHost{
         [Parameter(Mandatory=$True, HelpMessage='Hostname')] [string] $HostName,
         [Parameter(Mandatory=$True, HelpMessage='The Domain')] [string] $Domain,
         [Parameter(Mandatory=$false, HelpMessage='Address')] [string] $Address,
-        [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Description
+        [Parameter(Mandatory=$false, HelpMessage='The Description')] [string] $Description,
+        [Parameter(Mandatory=$true)][string]$PFObjectType
     )
     Begin{
-        $Object = (New-Object -TypeName "PFUnboundHost")
+        $Object = (New-Object -TypeName $PFObjectType)
     }
     process{
-        $PFObject = Get-PFunboundHost -Server $InputObject
+        $PFObject = Get-PFdnsHost -Server $InputObject -PFObjectType $PFObjectType
         # Test UserInput
         $ThrowError = $true
         foreach($hostoverride in $PFObject){
@@ -2848,7 +2967,7 @@ Function Edit-PFUnboundHost{
                 }
             }
         }
-        Set-PFUnboundHost -InputObject $PFserver -NewObject $PFObject
+        Set-PFDNSHost -InputObject $PFserver -NewObject $PFObject -PFObjectType $PFObjectType
     }
 }
 

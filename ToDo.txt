@@ -9,13 +9,19 @@ Done.
 
 DNSForwarder:
 Print : Done
-Edit :
+Edit : Done
 We cannot add or delete because this are the default settings of the deamon
 
 DNSForwarderHost:
-Print : 
-Edit : 
-Add : 
+Print : Done
+Edit : Done
+Add : Done
+Delete : Done
+
+DNSForwarderDomain:
+Print : Done
+Edit : Done
+Add : Done
 Delete : 
 
 DnsResolver:
@@ -56,4 +62,4 @@ print: Look if possible to extract more info from base64 crt
 
 
 
-
+!! find out if dns domain can be done at the same way as dns host !!

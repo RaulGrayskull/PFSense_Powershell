@@ -695,34 +695,6 @@ function Get-PFDnsMasq {
     }    
 }
 
-function Get-PFDnsMasqHost {
-    [CmdletBinding()]
-    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
-    process {
-        $PFDnsMasqHost = $InputObject | ConvertTo-PFObject -PFObjectType "PFDnsMasqhost" -arrayoverride
-        foreach($PFhost in $PFDnsMasqHost){
-            ("_AliasesHost","_AliasesDomain","_AliasesDescription") | foreach{
-                if($PFhost.$_ -eq "System.Xml.XmlElement Item(string name) {get;}, System.Xml.XmlElement Item(string localname, string ns) {get;}"){$PFhost.$_ = ""}
-            }
-            $index = 0
-            $Properties = @{}
-            $Object = New-Object -TypeName "PFDnsMasqHostEntry" -Property $Properties
-            while($PFhost._AliasesHost[$Index]){
-                $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
-                    $Property = $_.Name
-                    try {$PropertyValue = $PFhost.$Property[$index]}
-                    catch{$PropertyValue = $PFhost.$Property}
-                    $Properties.$Property = $PropertyValue
-                }
-                $NewObject = New-Object -TypeName "PFDnsMasqHostEntry" -Property $Properties
-                $PFhost.Alias += $NewObject
-                $Index++
-            }
-        }
-        return $PFDnsMasqHost
-    }    
-}
-
 function Set-PFDnsMasq {
     [CmdletBinding()]
     param (
@@ -730,6 +702,38 @@ function Set-PFDnsMasq {
         [Parameter(Mandatory=$true)][psobject]$NewObject)
     process{
         ConvertFrom-PFObject -InputObject $InputObject -PFObject $NewObject -PFObjectType "PFDnsMasq"
+    }    
+}
+
+function Get-PFDnsMasqDomain {
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
+    process { 
+        $PFDnsMasqDomain = $InputObject | ConvertTo-PFObject -PFObjectType "PFDnsMasqDomain" -arrayoverride
+        return $PFDnsMasqDomain
+    }
+}
+
+function Set-PFDnsMasqDomain {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
+        [Parameter(Mandatory=$true)][psobject]$NewObject)
+        begin{
+            $UploadArray = @()
+        }
+        process{
+            foreach($object in $NewObject){
+                $UploadHashtable = @{}
+                $object | Get-Member -MemberType properties | foreach {
+                    $UploadHashtable[$_.name] = $object.($_.name)
+                }
+                $UploadArray += $UploadHashtable
+            }
+
+        $PFDnsMasq = Get-PFDnsMasq -InputObject $InputObject
+        $PFDnsMasq.domainoverrides = $UploadArray
+        ConvertFrom-PFObject -InputObject $InputObject -PFObject $PFDnsMasq -PFObjectType "PFDnsMasq"
     }    
 }
 
@@ -991,18 +995,21 @@ function Set-PFUnbound {
     }    
 }
 
-function Get-PFunboundHost {
+function Get-PFdnsHost {
     [CmdletBinding()]
-    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
+    param (
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
+        [Parameter(Mandatory=$true)][string]$PFObjectType
+        )
     process { 
-        $PFunboundHost = $InputObject | ConvertTo-PFObject -PFObjectType "PFunboundHost" -arrayoverride
-        foreach($PFhost in $PFunboundHost){
+        $PFdnsHost = $InputObject | ConvertTo-PFObject -PFObjectType $PFObjectType -arrayoverride
+        foreach($PFhost in $PFdnsHost){
             ("_AliasesHost","_AliasesDomain","_AliasesDescription") | foreach{
                 if($PFhost.$_ -eq "System.Xml.XmlElement Item(string name) {get;}, System.Xml.XmlElement Item(string localname, string ns) {get;}"){$PFhost.$_ = ""}
             }
             $index = 0
             $Properties = @{}
-            $Object = New-Object -TypeName "PFUnboundHostEntry" -Property $Properties
+            $Object = New-Object -TypeName "PFDnsHostEntry" -Property $Properties
             while($PFhost._AliasesHost[$Index]){
                 $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
                     $Property = $_.Name
@@ -1010,12 +1017,12 @@ function Get-PFunboundHost {
                     catch{$PropertyValue = $PFhost.$Property}
                     $Properties.$Property = $PropertyValue
                 }
-                $NewObject = New-Object -TypeName "PFUnboundHostEntry" -Property $Properties
+                $NewObject = New-Object -TypeName "PFDnsHostEntry" -Property $Properties
                 $PFhost.Alias += $NewObject
                 $Index++
             }
         }
-        return $PFunboundHost
+        return $PFdnsHost
     }
 }
 
@@ -1051,7 +1058,7 @@ function Set-PFunboundDomain {
     }    
 }
 
-function Set-PFunboundHost {
+function Set-PFDNSHost {
     <#
     This set function works just a little differend, here we already set the aliasses before we send it to the ConvertFrom-PFObject.
     This is done because that part of the script does not yet can handel the dubble / in the staticmapping.
@@ -1059,7 +1066,9 @@ function Set-PFunboundHost {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
-        [Parameter(Mandatory=$true)][psobject]$NewObject)
+        [Parameter(Mandatory=$true)][psobject]$NewObject,
+        [Parameter(Mandatory=$true)][string]$PFObjectType
+        )
     begin{
         $UploadArray = @()
     }
@@ -1086,9 +1095,16 @@ function Set-PFunboundHost {
             $UploadArray += $UploadHashtable
         }
         # Now we need to get all the other unbound setting and set the host part. this has to be done to keep all the dns settings.
-        $PFUnbound = Get-PFUnbound -InputObject $InputObject
-        $PFUnbound.hosts = $UploadArray
-        ConvertFrom-PFObject -InputObject $InputObject -PFObject $PFUnbound -PFObjectType "PFunbound"
+        if($PFObjectType -eq "PFunboundHost"){
+            $PFUnbound = Get-PFUnbound -InputObject $InputObject
+            $PFUnbound.hosts = $UploadArray
+            ConvertFrom-PFObject -InputObject $InputObject -PFObject $PFUnbound -PFObjectType "PFunbound"
+        }
+        if($PFObjectType -eq "PFDnsMasqHost"){
+            $pfdnsmasq = Get-PFDnsMasq -InputObject $InputObject
+            $pfdnsmasq.hosts = $UploadArray
+            ConvertFrom-PFObject -InputObject $InputObject -PFObject $pfdnsmasq -PFObjectType "PFdnsmasq"
+        }
     }    
 }
 

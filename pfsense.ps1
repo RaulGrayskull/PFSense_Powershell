@@ -52,6 +52,13 @@ Param
     [Parameter(Mandatory=$false, HelpMessage='The Active interfaces')][Alias('ActiveInterface')][string] $ActiveInt,
     [Parameter(Mandatory=$false, HelpMessage='The Outgoint Interfaces')][string] $OutgoingInterface,
     [Parameter(Mandatory=$false, HelpMessage='DNS Sec enable or disable')][bool] $dnssec,
+    [Parameter(Mandatory=$false, HelpMessage='.')][bool] $DHCPReg,
+    [Parameter(Mandatory=$false, HelpMessage='.')][bool] $DHCPRegstatic,
+    [Parameter(Mandatory=$false, HelpMessage='.')][bool] $Dhcpfirst,
+    [Parameter(Mandatory=$false, HelpMessage='.')][bool] $DomainNeeded,
+    [Parameter(Mandatory=$false, HelpMessage='.')][bool] $StrictOrder,
+    [Parameter(Mandatory=$false, HelpMessage='.')][bool] $NoPrivateReverse,
+    [Parameter(Mandatory=$false, HelpMessage='.')][bool] $Strictbind,
     [Parameter(Mandatory=$false, HelpMessage='The port you would like to use')][string] $port,
     [Parameter(Mandatory=$false, HelpMessage='The SSL port')][string] $sslport,
     [Parameter(Mandatory=$false, HelpMessage='Costum Options')][string] $CustomOptions,
@@ -819,7 +826,117 @@ Function Write-PFDHCPstaticmap{
     }
 }
 
+Function Edit-PFDnsMasq{
+    <#
+    .SYNOPSIS
+    the Edit-PFDnsMasq function sets the settings for the dnsmasq / dnsforwarder of the pfsense
+
+    .DESCRIPTION
+    the Edit-PFDnsMasq function sets the settings for the dnsmasq / dnsforwarder of the pfsense
+  
+    .parameter Enable 
+    Enable DNS forwarder
+    
+    .parameter DHCPReg
+    Register DHCP leases in DNS forwarder
+    If this option is set machines that specify their hostname when requesting a DHCP lease will be registered in the DNS forwarder, so that their name can be resolved. The domain in System: General Setup should also be set to the proper value.
+
+    .parameter DHCPRegstatic
+    Register DHCP static mappings in DNS forwarder 
+    If this option is set, IPv4 DHCP static mappings will be registered in the DNS forwarder so that their name can be resolved. The domain in System: General Setup should also be set to the proper value.
+
+    .parameter Dhcpfirst
+    Resolve DHCP mappings first
+    If this option is set DHCP mappings will be resolved before the manual list of names below. This only affects the name given for a reverse lookup (PTR).
+
+    .parameter DomainNeeded
+    Require domain
+    If this option is set pfSense DNS Forwarder (dnsmasq) will not forward A or AAAA queries for plain names, without dots or domain parts, to upstream name servers. If the name is not known from /etc/hosts or DHCP then a "not found" answer is returned. 
+
+    .parameter StrictOrder
+    Query DNS servers sequentially
+    If this option is set pfSense DNS Forwarder (dnsmasq) will query the DNS servers sequentially in the order specified (System - General Setup - DNS Servers), rather than all at once in parallel. 
+
+    .parameter NoPrivateReverse
+    Do not forward private reverse lookups
+    If this option is set pfSense DNS Forwarder (dnsmasq) will not forward reverse DNS lookups (PTR) for private addresses (RFC 1918) to upstream name servers. Any entries in the Domain Overrides section forwarding private "n.n.n.in-addr.arpa" names to a specific server are still forwarded. If the IP to name is not known from /etc/hosts, DHCP or a specific domain override then a "not found" answer is immediately returned. 
+
+    .parameter Strictbind
+    Strict interface binding
+    If this option is set, the DNS forwarder will only bind to the interfaces containing the IP addresses selected above, rather than binding to all interfaces and discarding queries to other addresses.
+    This option does NOT work with IPv6. If set, dnsmasq will not bind to IPv6 addresses.
+
+    .parameter CustomOptions
+    Enter any additional options to add to the dnsmasq configuration here, separated by a space or newline.
+
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsForwarder -action Edit -DHCPReg $True -DHCPRegstatic $false -Dhcpfirst $True -DomainNeeded $True -StrictOrder $True -NoPrivateReverse $True -Strictbind $True -CustomOptions 'This is a test entry' -notls
+
+    .EXAMPLE
+    ./pfsense.ps1' -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsForwarder -action Enable -notls
+    
+    .EXAMPLE
+    ./pfsense.ps1' -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsForwarder -action Disable -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+    
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject,
+        [Parameter(Mandatory=$false, HelpMessage='Enable DNS forwarder')] [Bool]$Enable = $true,
+        [Parameter(Mandatory=$false, HelpMessage='The port you would like to use')][string] $port,
+        [Parameter(Mandatory=$false, HelpMessage='The Active interfaces')][Alias('ActiveInterface')][string] $ActiveInt,
+        [Parameter(Mandatory=$false, HelpMessage='Register DHCP leases in DNS forwarder')][bool] $DHCPReg,
+        [Parameter(Mandatory=$false, HelpMessage='Register DHCP leases in DNS forwarder')][bool] $DHCPRegstatic,
+        [Parameter(Mandatory=$false, HelpMessage='Resolve DHCP mappings first')][bool] $Dhcpfirst,
+        [Parameter(Mandatory=$false, HelpMessage='If this option is set pfSense DNS Forwarder (dnsmasq) will not forward A or AAAA queries for plain names')][bool] $DomainNeeded,
+        [Parameter(Mandatory=$false, HelpMessage='If this option is set pfSense DNS Forwarder (dnsmasq) will query the DNS servers sequentially in the order specified (System - General Setup - DNS Servers), rather than all at once in parallel.')][bool] $StrictOrder,
+        [Parameter(Mandatory=$false, HelpMessage='If this option is set pfSense DNS Forwarder (dnsmasq) will not forward reverse DNS lookups (PTR) for private addresses (RFC 1918) to upstream name servers.')][bool] $NoPrivateReverse,
+        [Parameter(Mandatory=$false, HelpMessage='Strict interface binding')][bool] $Strictbind,
+        [Parameter(Mandatory=$false, HelpMessage='any additional options')][string]$CustomOptions
+        )
+    Begin{
+    }
+    process{
+        $PFObject = get-PFDnsMasq -Server $InputObject
+        $PFObject | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+            # Only set if variable is set
+            if(-not [string]::IsNullOrWhiteSpace($(get-variable $_.name -valueOnly -ErrorAction Ignore))){ # Only set object if variable is set. don't override with empty value's
+                $PFObject.$($_.name) = $(get-variable $_.name -valueOnly -ErrorAction Ignore)
+            }
+        }
+        Set-PFDnsMasq -InputObject $InputObject -NewObject $PFObject
+        
+    }
+}
 Function Write-PFDnsMasq{
+    <#
+    .SYNOPSIS
+    The Write-PFDnsMasq function display's the DNSmasq/DNSForwarder settings
+
+    .DESCRIPTION
+    The Write-PFDnsMasq function display's the DNSmasq/DNSForwarder settings
+  
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsForwarder -action print -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+    
+    #>
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+    }
+    process{
+        $PFObject = get-PFDnsMasq -Server $InputObject
+        $PFObject | Format-table Enable,Port,ActiveInterface,DHCPReg,DHCPRegstatic,DHCPfirst,DomainNeeded,StrictOrder,NoPrivateReverse,Strictbind
+    }
+}
+
+Function Write-PFDnsMasqHost{
     <#
     .SYNOPSIS
     
@@ -839,10 +956,63 @@ Function Write-PFDnsMasq{
     Begin{
     }
     process{
-        $PFObject = get-PFDnsMasq -Server $InputObject
-        $PFObject | Format-table Enable,Port,Interface,DHCPReg,DHCPRegstatic,DHCPfirst,DomainNeeded,StrictOrder,NoPrivateReverse,Strictbind
+        $PFObject = get-PFDnsMasqhost -Server $InputObject
+        $WriteObject = New-Object System.Collections.ArrayList
+        foreach($PFHost in $PFObject){
+            $index = 0
+            $Object = New-Object -TypeName "PFDnsMasqHost" -Property $Properties
+            $Properties = @{}
+            try{
+                # first we add the first alias to the $writeObject
+                $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object{
+                    if($PFHost.$($_.name).gettype() -eq [PFDnsMasqHostEntry[]]){$Properties.add(($_.name),$PFHost.$($_.name)[$Index])}
+                    else{$Properties.add(($_.name),$PFHost.$($_.name))}
+                }
+                $NewObject = New-Object -TypeName "PFDnsMasqHost" -Property $Properties 
+                $WriteObject.add($NewObject) | out-null
+                # Now we add one to the index to add all the other aliases to the writeobject
+                $index++
+                $Properties = @{}
+                while($PFHost.Alias[$index]){
+                    $Properties.Alias = $PFHost.Alias[$Index]
+                    $NewObject = New-Object -TypeName "PFDnsMasqHost" -Property $Properties 
+                    $WriteObject.add($NewObject) | out-null
+                    $index++
+                }
+            }
+            catch{$WriteObject.add($PFHost) | out-null}
+        }
+        $WriteObject | Format-table Hostname,Domain,Address,Description,Alias
     }
 }
+
+
+Function Write-PFDnsMasqCustomOptions {
+    <#
+    .SYNOPSIS
+    The Write-PFDnsMasqCustomOptions function display's the DNSmasq/DNSForwarder CustomOptions
+
+    .DESCRIPTION
+    The Write-PFDnsMasqCustomOptions function display's the DNSmasq/DNSForwarder CustomOptions
+  
+    .EXAMPLE
+    ./pfsense.ps1 -Server 192.168.0.1 -Username admin -InsecurePassword pfsense -SkipCertificateCheck -Service dnsForwarder -action print -notls
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+    
+    #>
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+    }
+    process{
+        $PFObject = get-PFDnsMasq -Server $InputObject
+        $PFObject.CustomOptions 
+    }
+}
+
+
 
 Function Add-PFFirewall{
     <#
@@ -2924,7 +3094,7 @@ try{
     if(-not $Flow.ContainsKey($Service)){  Write-Host "Unknown service '$Service'" -ForegroundColor red; exit 2 }
     if(-not $Flow.$Service.ContainsKey($Action)){ Write-Host "Unknown action '$Action' for service '$Service'" -ForegroundColor red; exit 3 }
 
-    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer,$path,$file,$Network,$Gateway,$Description,$Interface,$From,$To,$netmask,$Domain,$DNSServer,$NTPServer,$Alias,$Type,$Address,$Detail,$HostName,$ClientID,$MacAddr,$Protocol,$SourceAddress,$DestAddress,$DestPort,$NatIp,$NatPort,$Weight,$Monitor,$Name,$IpProtocol,$IsLogged,$IsQuick,$IsFloating,$tracker,$OldLineNumber,$NewLineNumber,$IPv4Address,$IPv4Subnet,$IPv4Gateway,$IPv6Address,$IPv6Subnet,$IPv6Gateway,$blockpriv,$BlockBogons,$ActiveInt,$OutgoingInterface,$dnssec,$sslport,$CustomOptions,$sslcertref,$port,$HostNameAlias,$DomainAlias,$DescriptionAlias,$TLSQueries,$TlsHostname,$Tag,$Priority
+    Invoke-Command -ScriptBlock ([ScriptBlock]::Create($Flow.$Service.$Action)) -ArgumentList $PFServer,$path,$file,$Network,$Gateway,$Description,$Interface,$From,$To,$netmask,$Domain,$DNSServer,$NTPServer,$Alias,$Type,$Address,$Detail,$HostName,$ClientID,$MacAddr,$Protocol,$SourceAddress,$DestAddress,$DestPort,$NatIp,$NatPort,$Weight,$Monitor,$Name,$IpProtocol,$IsLogged,$IsQuick,$IsFloating,$tracker,$OldLineNumber,$NewLineNumber,$IPv4Address,$IPv4Subnet,$IPv4Gateway,$IPv6Address,$IPv6Subnet,$IPv6Gateway,$blockpriv,$BlockBogons,$ActiveInt,$OutgoingInterface,$dnssec,$sslport,$CustomOptions,$sslcertref,$port,$HostNameAlias,$DomainAlias,$DescriptionAlias,$TLSQueries,$TlsHostname,$Tag,$Priority,$DHCPReg,$DHCPRegstatic,$Dhcpfirst,$DomainNeeded,$StrictOrder,$NoPrivateReverse,$Strictbind
  
 } catch { 
     Write-Error $_.Exception.Message

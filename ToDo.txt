@@ -8,8 +8,9 @@ DhcpStaticMap:
 Done.
 
 DNSForwarder:
-Print :
+Print : Done
 Edit :
+We cannot add or delete because this are the default settings of the deamon
 
 DNSForwarderHost:
 Print : 
@@ -56,6 +57,3 @@ print: Look if possible to extract more info from base64 crt
 
 
 
-
-Think about:
-Set-pfunbound, could be joined with Set-pfunboundHosts and Set-pfunboundDomain

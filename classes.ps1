@@ -138,7 +138,7 @@ class PFDnsMasq{
     [bool]$DomainNeeded
     [bool]$NoPrivateReverse
     [string]$CustomOptions
-    [PFInterface[]]$Interface
+    [PFInterface[]]$ActiveInterface
     [hashtable[]]$Hosts
     [hashtable[]]$domainoverrides
     [bool]$Strictbind
@@ -152,6 +152,39 @@ class PFDnsMasq{
         NoPrivateReverse = "no_private_reverse"
         CustomOptions = "custom_options"
         DHCPRegstatic = "Regdhcpstatic"
+        ActiveInterface = "Interface"
+    }
+}
+
+class PFDnsMasqHost{
+    [PFDnsMasqHostEntry[]]$Alias
+    [string]$Description
+    [string]$domain
+    [string]$Hostname
+    [string]$Address
+    [string[]]$_AliasesDescription
+    [string[]]$_AliasesDomain
+    [string[]]$_AliasesHost
+
+    static [string]$Section = "dnsmasq/hosts"
+    # property name as it appears in the XML, insofar it's different from the object's property name
+    static $PropertyMapping = @{
+        Description = "descr"
+        Hostname = "host"
+        Address = "ip"
+        _AliasesDescription = "aliases/item/description"
+        _AliasesDomain = "aliases/item/domain"
+        _AliasesHost = "aliases/item/host"
+    }
+}
+
+class PFDnsMasqHostEntry{
+    [string]$_AliasesHost
+    [string]$_AliasesDomain
+    [String]$_AliasesDescription
+
+    [string] ToString(){
+        return ("{0}.{1}: Description= {2}" -f $this._AliasesHost,$this._AliasesDomain,$this._AliasesDescription)
     }
 }
 

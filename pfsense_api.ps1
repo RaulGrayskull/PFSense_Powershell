@@ -695,6 +695,44 @@ function Get-PFDnsMasq {
     }    
 }
 
+function Get-PFDnsMasqHost {
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
+    process {
+        $PFDnsMasqHost = $InputObject | ConvertTo-PFObject -PFObjectType "PFDnsMasqhost" -arrayoverride
+        foreach($PFhost in $PFDnsMasqHost){
+            ("_AliasesHost","_AliasesDomain","_AliasesDescription") | foreach{
+                if($PFhost.$_ -eq "System.Xml.XmlElement Item(string name) {get;}, System.Xml.XmlElement Item(string localname, string ns) {get;}"){$PFhost.$_ = ""}
+            }
+            $index = 0
+            $Properties = @{}
+            $Object = New-Object -TypeName "PFDnsMasqHostEntry" -Property $Properties
+            while($PFhost._AliasesHost[$Index]){
+                $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
+                    $Property = $_.Name
+                    try {$PropertyValue = $PFhost.$Property[$index]}
+                    catch{$PropertyValue = $PFhost.$Property}
+                    $Properties.$Property = $PropertyValue
+                }
+                $NewObject = New-Object -TypeName "PFDnsMasqHostEntry" -Property $Properties
+                $PFhost.Alias += $NewObject
+                $Index++
+            }
+        }
+        return $PFDnsMasqHost
+    }    
+}
+
+function Set-PFDnsMasq {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject,
+        [Parameter(Mandatory=$true)][psobject]$NewObject)
+    process{
+        ConvertFrom-PFObject -InputObject $InputObject -PFObject $NewObject -PFObjectType "PFDnsMasq"
+    }    
+}
+
 
 function Set-PFFirewall {
     [CmdletBinding()]

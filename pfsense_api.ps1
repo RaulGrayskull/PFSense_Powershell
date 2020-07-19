@@ -617,6 +617,51 @@ function Set-PFAlias {
     }    
 }
 
+function Get-PFBind {
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
+    process {
+        $pfbind = $InputObject | ConvertTo-PFObject -PFObjectType "pfbind" -ArrayOverride
+        if(-not $pfbind.BindIpVersion){
+            $pfbind.BindIpVersion = "IPv4+IPv6"
+        }
+        else{$pfbind.BindIpVersion = "IPv{0}" -f -$pfbind.BindIpVersion}
+        return $pfbind
+    }
+}
+
+function Get-PFBindAcls {
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
+    process {
+        $PFBindAcls = $InputObject | ConvertTo-PFObject -PFObjectType  "pfbindacls"
+        foreach($PFBindAcl in $PFBindAcls){
+            $index = 0
+            $Properties = @{}
+            $Object = New-Object -TypeName "PFBindAclsEntry" -Property $Properties
+            while($PFBindAcl._value[$Index]){
+                $Object | Get-Member -MemberType properties | Select-Object -Property Name | ForEach-Object {
+                    $Property = $_.Name
+                    try {$PropertyValue = $PFBindAcl.$Property[$index]}
+                    catch{$PropertyValue = $PFBindAcl.$Property}
+                    $Properties.$Property = $PropertyValue
+                }
+                $NewObject = New-Object -TypeName "PFBindAclsEntry" -Property $Properties
+                $PFBindAcl.RangeBlock += $NewObject
+                $Index++
+            }
+        }
+        return $PFBindAcls
+    }
+}
+function Get-PFbindviews {
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)
+    process {
+        $InputObject | ConvertTo-PFObject -PFObjectType  "pfbindviews" -ArrayOverride
+    }
+}
+
 function Get-PFCert {
     [CmdletBinding()]
     param ([Parameter(Mandatory=$true, ValueFromPipeline=$true)][Alias('Server')][psobject]$InputObject)

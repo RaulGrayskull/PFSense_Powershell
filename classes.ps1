@@ -28,6 +28,139 @@ class PFAliasEntry {
     }
 }
 
+class pfbind {
+    [string]$BindRamLimit
+    [bool]$EnableBind
+    [string]$BindDnssecValidation
+    [string]$BindGlobalSettings
+    [string[]]$LogOptions
+    [ValidateSet('critical', 'error', 'warning', 'notice', 'info', 'debug 1', 'debug 3', 'debug 5', 'dynamic')][string]$LogSeverity
+    [bool]$BindHideVersion
+    [string]$RateEnabled
+    [pfinterface[]]$listenon
+    [string]$controlport
+    [bool]$BindNotify
+    [bool]$BindForwarder
+    [bool]$BindLogging
+    [string]$RateLimit
+    [string]$BindIpVersion
+    [string]$LogOnly
+    [string]$listenport
+    [string]$BindForwarderIps
+    [string]$BindCustomOptions
+
+    static [string]$Section = "installedpackages/bind/config"
+    # property name as it appears in the XML, insofar it's different from the object's property name
+    static $PropertyMapping = @{
+        BindRamLimit = "bind_ram_limit"
+        EnableBind = "enable_bind"
+        BindDnssecValidation = "bind_dnssec_validation"
+        BindGlobalSettings = "bind_global_settings"
+        LogOptions = "log_options"
+        LogSeverity = "log_severity"
+        BindHideVersion = "bind_hide_version"
+        RateEnabled = "rate_enabled"
+        BindNotify = "bind_notify"
+        BindForwarder = "bind_forwarder"
+        BindLogging = "bind_logging"
+        RateLimit = "rate_limit"
+        BindIpVersion = "bind_ip_version"
+        LogOnly = "log_only"
+        BindForwarderIps = "bind_forwarder_ips"
+        BindCustomOptions = "bind_custom_options"
+    } 
+}
+
+
+class pfbindacls {
+    [string[]]$row
+    [string]$acl
+    [string]$description
+    [string[]]$_value
+    [string[]]$_description
+    [PFBindAclsEntry[]]$RangeBlock
+
+    static [string]$Section = "installedpackages/bindacls/config"
+    # property name as it appears in the XML, insofar it's different from the object's property name
+    static $PropertyMapping = @{
+        acl = "name"
+        _Value = "row/value"
+        _description = "row/description"
+    } 
+}
+
+class PFBindAclsEntry{
+    [string]$_value
+    [String]$_Description
+
+    [string] ToString(){
+        return ("{0}: {1}" -f $this._value,$this._Description)
+    }
+}
+
+
+class pfbindviews {
+    [string]$recursion
+    [string]$description
+    [string]$BindCustomOptions
+    [PFInterface[]]$MatchClients
+    [PFInterface[]]$AllowRecursion
+    [string]$temp
+    [string]$name
+
+    static [string]$Section = "installedpackages/bindviews/config"
+    # property name as it appears in the XML, insofar it's different from the object's property name
+    static $PropertyMapping = @{
+        BindCustomOptions = "bind_custom_options"
+        MatchClients = "Match-Clients"
+        AllowRecursion = "allow-recursion"
+    } 
+}
+
+class pfbindZone {
+    [hashtable[]]$row
+    [string]$dnssec
+    [string]$allowquery
+    [string]$tll
+    [string]$disabled
+    [string]$temp01
+    [string]$regdhcpstatic
+    [string]$serial
+    [string]$backupkeys
+    [string]$type
+    [string]$resultconfig
+    [string]$expire
+    [string]$reversv6o
+    [string]$temp04
+    [string]$minimum
+    [string]$ipns
+    [string]$temp03
+    [string]$rpz
+    [string]$description
+    [string]$allowtransfer
+    [string]$reverso
+    [string]$allowupdate
+    [string]$slaveip
+    [string]$enable_updatepolicy
+    [string]$updatepolicy
+    [string]$nameserver
+    [string]$customzonerecords
+    [string]$view
+    [string]$retry
+    [string]$dsset
+    [string]$forwarders
+    [string]$name
+    [string]$refresh
+    [string]$custom
+    [string]$temp02
+    [string]$mail
+
+    static [string]$Section = "installedpackages/bindzone/config"
+    # property name as it appears in the XML, insofar it's different from the object's property name
+    static $PropertyMapping = @{
+    } 
+}
+
 class PFCert {
     [string]$ReferenceID
     [string]$Description

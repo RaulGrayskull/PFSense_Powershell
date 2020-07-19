@@ -419,6 +419,81 @@ Function Write-PFAlias{
     $Collection | Format-table Name,Type,Description,Entry
     }
 }
+Function Write-PFBind{
+    <#
+    .SYNOPSIS
+
+
+    .DESCRIPTION
+
+
+    .EXAMPLE
+
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+
+    #>
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+    }
+    process{
+        $PFObject = get-PFBind -Server $InputObject
+        $PFObject | Format-table EnableBind,BindIpVersion,listenon,listenport,BindNotify,BindHideVersion,BindRamLimit,BindLogging,LogSeverity,LogOptions,BindForwarder,BindForwarderIps
+    }
+}
+
+Function Write-PFBindAcls{
+        <#
+    .SYNOPSIS
+    
+
+    .DESCRIPTION
+    
+  
+    .EXAMPLE
+    
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+    
+    #>
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+    }
+    process{
+        $PFObject = get-PFBindAcls -Server $InputObject
+        $PFObject | Format-table acl,description,RangeBlock
+    }
+}
+
+
+Function Write-PFBindviews{
+    <#
+    .SYNOPSIS
+
+
+    .DESCRIPTION
+
+
+    .EXAMPLE
+
+
+    .LINK
+    https://github.com/RaulGrayskull/PFSense_Powershell
+
+    #>
+    [CmdletBinding()]
+    param ([Parameter(Mandatory=$true)][Alias('Server')][PFServer]$InputObject)
+    Begin{
+    }
+    process{
+        $PFObject = get-PFBindviews -Server $InputObject
+        $PFObject | Format-table 
+    }
+}
 
 Function Write-PFCert{
     <#
